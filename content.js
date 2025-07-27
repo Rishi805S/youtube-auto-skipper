@@ -1,69 +1,26 @@
-// Main Content Code
-// function waitForVideoAndTrack() {
-//   const checkInterval = setInterval(() => {
-//     const video = document.querySelector("video");
+// content.js
 
-//     if (video) {
-//       console.log("YouTube video found!");
-//       console.log("Current time:", video.currentTime);
+console.log("📦 content.js is injecting scripts...");
 
-//       // Start tracking playback time
-//       setInterval(() => {
-//         console.log("Current playback time:", video.currentTime);
-//       }, 2000);
+// 1. Create the Meyda script tag
+const meydaScript = document.createElement("script");
+meydaScript.src = chrome.runtime.getURL("meyda.min.js");
 
-//       clearInterval(checkInterval); // Stop looking once video is found
-//     }
-//   }, 1000); // Check every 1 second until video is loaded
-// }
+// 2. When the Meyda script finishes loading, THEN inject the analyzer script
+meydaScript.onload = () => {
+  console.log("✅ Meyda library loaded. Injecting analyzer...");
+  const analyzerScript = document.createElement("script");
+  analyzerScript.src = chrome.runtime.getURL("analyzer.js");
+  (document.head || document.documentElement).appendChild(analyzerScript);
 
-// waitForVideoAndTrack();
+  // Clean up the analyzer script tag after it's loaded
+  analyzerScript.onload = () => {
+    analyzerScript.remove();
+  };
+};
 
+// 3. Append the Meyda script to the page to start the process
+(document.head || document.documentElement).appendChild(meydaScript);
 
-
-// Code For Play, Pause, control speed and reset
-function waitForVideoAndTrack() {
-  const checkInterval = setInterval(() => {
-    const video = document.querySelector("video");
-
-    if (video) {
-      console.log("🎥 YouTube video found!");
-
-      // Optional: Log current playback time every 2s
-      setInterval(() => {
-        console.log("⏱️ Current playback time:", video.currentTime);
-      }, 4000);
-
-      // 🧪 Try video controls
-      setTimeout(() => {
-        console.log("⏸️ Pausing video...");
-        video.pause();
-
-        setTimeout(() => {
-          console.log("▶️ Resuming video...");
-          video.play();
-        }, 3000); // pause for 3s then play
-
-        setTimeout(() => {
-          console.log("⏩ Skipping 10 seconds...");
-          video.currentTime += 10;
-        }, 6000); // skip ahead after 6s
-        
-        setTimeout(() => {
-          console.log("⏩ Play back speed 2.0...");
-          video.playbackRate = 2.0;
-        }, 6000); // skip ahead after 6s
-
-        setTimeout(() => {
-          console.log("⏪ Rewinding 5 seconds...");
-          video.currentTime -= 5;
-        }, 9000); // rewind after 9s
-
-      }, 2000); // Delay initial control for video to stabilize
-
-      clearInterval(checkInterval);
-    }
-  }, 4000);
-}
-
-waitForVideoAndTrack();
+// Clean up the Meyda script tag after it's been appended and will start loading
+meydaScript.remove();
