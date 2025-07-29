@@ -5,17 +5,22 @@
   "description": "Automatically skips sponsored sections in YouTube videos.",
   "permissions": [
     "scripting",
-    "activeTab"
+    "activeTab",
+    "storage" 
   ],
   "host_permissions": [
-    "https://www.youtube.com/*"
+    "*://*.youtube.com/*",
+    "*://sponsor.ajay.app/*"
   ],
   "web_accessible_resources": [
     {
-      "resources": ["meyda.min.js", "analyzer.js"],
+      "resources": ["meyda.min.js", "analyzer.js", "interceptor.js"],
       "matches": ["*://*.youtube.com/*"]
     }
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": [
