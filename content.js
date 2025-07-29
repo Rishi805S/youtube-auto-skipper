@@ -1,26 +1,41 @@
 // content.js
 
-console.log("📦 content.js is injecting scripts...");
+console.log("🎬 YouTube Auto Skipper's content script loaded.");
 
-// 1. Create the Meyda script tag
-const meydaScript = document.createElement("script");
-meydaScript.src = chrome.runtime.getURL("meyda.min.js");
-
-// 2. When the Meyda script finishes loading, THEN inject the analyzer script
-meydaScript.onload = () => {
-  console.log("✅ Meyda library loaded. Injecting analyzer...");
-  const analyzerScript = document.createElement("script");
-  analyzerScript.src = chrome.runtime.getURL("analyzer.js");
-  (document.head || document.documentElement).appendChild(analyzerScript);
-
-  // Clean up the analyzer script tag after it's loaded
-  analyzerScript.onload = () => {
-    analyzerScript.remove();
-  };
+const injectScript = (fileName) => {
+  const script = document.createElement('script');
+  script.src = chrome.runtime.getURL(fileName);
+  (document.head || document.documentElement).appendChild(script);
+  console.log(`🚀 Injected ${fileName}`);
 };
 
-// 3. Append the Meyda script to the page to start the process
-(document.head || document.documentElement).appendChild(meydaScript);
+const main = (videoId) => {
+  console.log(`🎥 New video page detected. Video ID: ${videoId}`);
+  
+  // Here is where our Day 1 logic will begin.
+  // We will build this out starting tomorrow.
+  console.log("STEP 1: Checking SponsorBlock API...");
+  // TODO: Implement fetch call to SponsorBlock API.
 
-// Clean up the Meyda script tag after it's been appended and will start loading
-meydaScript.remove();
+  // For now, let's assume SponsorBlock has no data and inject our custom engine scripts.
+  console.log("STEP 2: SponsorBlock has no data. Initializing custom engine...");
+  
+  // We inject the scripts that will get us the transcript and audio features.
+  injectScript('interceptor.js');
+  // We will add the analyzer injection when we need it.
+};
+
+
+// Listen for messages from the background script
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === "NEW_VIDEO_PAGE") {
+    main(request.videoId);
+  }
+  return true; 
+});
+
+// We still listen for the transcript data from our injected script
+window.addEventListener('TranscriptReady', (event) => {
+    console.log("✅ Custom Engine: Transcript data received.", event.detail.length, "segments found.");
+    // TODO: Pass this data to our scoring/analysis function.
+});
