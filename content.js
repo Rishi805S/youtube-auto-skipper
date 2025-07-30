@@ -9,20 +9,37 @@ const injectScript = (fileName) => {
   console.log(`🚀 Injected ${fileName}`);
 };
 
-const main = (videoId) => {
+const main = async (videoId) => {
   console.log(`🎥 New video page detected. Video ID: ${videoId}`);
-  
-  // Here is where our Day 1 logic will begin.
-  // We will build this out starting tomorrow.
-  console.log("STEP 1: Checking SponsorBlock API...");
-  // TODO: Implement fetch call to SponsorBlock API.
 
-  // For now, let's assume SponsorBlock has no data and inject our custom engine scripts.
-  console.log("STEP 2: SponsorBlock has no data. Initializing custom engine...");
+  // This is the code you just added. Perfect.
+  const video = document.querySelector('video');
+  if (!video) {
+    console.error("Could not find the video player element.");
+    return; 
+  }
   
-  // We inject the scripts that will get us the transcript and audio features.
-  injectScript('interceptor.js');
-  // We will add the analyzer injection when we need it.
+  // This is the code from yesterday that fetches the data.
+  try {
+    const response = await fetch(`https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}&category=sponsor`);
+    
+    if (!response.ok) {
+      throw new Error(`SponsorBlock API returned status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data && data.length > 0) {
+      console.log("✅ SponsorBlock found segments!", data);
+      console.log(`Skipping to ${data[0].segment[1]} seconds...`);
+      video.currentTime = data[0].segment[1];
+    } else {
+      console.log("🟡 SponsorBlock has no data for this video.");
+    }
+
+  } catch (error) {
+    console.error("❌ Error fetching from SponsorBlock:", error);
+  }
 };
 
 
