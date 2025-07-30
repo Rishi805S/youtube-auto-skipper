@@ -14,7 +14,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["meyda.min.js", "analyzer.js", "interceptor.js"],
+      "resources": ["meyda.min.js", "analyzer.js", "interceptor.js", "constants.js"],
       "matches": ["*://*.youtube.com/*"]
     }
   ],
