@@ -1,0 +1,36 @@
+{
+  "name": "youtube-auto-skipper",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "build:ts": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "format": "prettier --write \"src/**/*.{js,ts,tsx,json,css,md}\"",
+    "format-check": "prettier --check \"src/**/*.{js,ts,tsx,json,css,md}\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rishi805S/youtube-auto-skipper.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Rishi805S/youtube-auto-skipper/issues"
+  },
+  "homepage": "https://github.com/Rishi805S/youtube-auto-skipper#readme",
+  "devDependencies": {
+    "@types/chrome": "^0.1.1",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
+    "eslint": "^9.32.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.3",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.39.0"
+  }
+}
