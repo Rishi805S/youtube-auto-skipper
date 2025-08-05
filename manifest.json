@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "YouTube Auto Skipper",
   "version": "1.0",
+  "type": "module",
   "description": "Automatically skips sponsored sections in YouTube videos.",
   "permissions": [
     "scripting",
