@@ -8,8 +8,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   console.log('[BG] GET_SPONSOR_SEGMENTS for', msg.videoId);
 
   sb.fetchSegments(msg.videoId)
-    .then(segments => sendResponse({ segments }))
-    .catch(err => {
+    .then((segments) => sendResponse({ segments }))
+    .catch((err) => {
       console.error('[BG] SponsorBlock error', err);
       sendResponse({ segments: [] });
     });

@@ -9,19 +9,16 @@ function getVideoId(): string | null {
 }
 
 function requestSponsorSegments(videoId: string): Promise<Segment[]> {
-  return new Promise(resolve => {
-    chrome.runtime.sendMessage(
-      { type: 'GET_SPONSOR_SEGMENTS', videoId },
-      resp => {
-        if (chrome.runtime.lastError) {
-          console.error('[CS] message error:', chrome.runtime.lastError);
-          resolve([]);
-        } else {
-          console.log('[CS] Received segments:', resp.segments);
-          resolve(resp.segments || []);
-        }
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: 'GET_SPONSOR_SEGMENTS', videoId }, (resp) => {
+      if (chrome.runtime.lastError) {
+        console.error('[CS] message error:', chrome.runtime.lastError);
+        resolve([]);
+      } else {
+        console.log('[CS] Received segments:', resp.segments);
+        resolve(resp.segments || []);
       }
-    );
+    });
   });
 }
 

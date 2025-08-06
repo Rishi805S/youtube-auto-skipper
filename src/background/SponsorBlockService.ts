@@ -18,13 +18,12 @@ export class SponsorBlockService {
       return [];
     }
 
-    const data: Array<{ segment: [number, number]; category: string }> =
-      await resp.json();
+    const data: Array<{ segment: [number, number]; category: string }> = await resp.json();
 
-    const segments = data.map(item => ({
+    const segments = data.map((item) => ({
       start: item.segment[0],
-      end:   item.segment[1],
-      category: item.category
+      end: item.segment[1],
+      category: item.category,
     }));
 
     console.log('[SB] received segments:', segments);
