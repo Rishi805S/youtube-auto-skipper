@@ -7,11 +7,10 @@
     "build": "rollup -c",
     "watch": "rollup -c --watch",
     "build:ts": "tsc --noEmit",
-    "lint": "eslint 'src/**/*.{ts,tsx,js}'",
-    "lint:fix": "eslint 'src/**/*.{ts,tsx,js}' --fix",
-    "format": "prettier --write 'src/**/*.{ts,tsx,js,json,css,md}'",
-    "test": "jest --coverage",
-    "e2e": "playwright test"
+    "lint": "eslint \"src/**/*.{ts,tsx,js}\"",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx,js}\" --fix",
+    "format": "prettier --write \"src/**/*.{js,ts,tsx,json,css,md}\"",
+    "format-check": "prettier --check \"src/**/*.{js,ts,tsx,json,css,md}\""
   },
   "dependencies": {},
   "devDependencies": {

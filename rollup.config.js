@@ -23,15 +23,4 @@ export default [
     },
     plugins: [resolve(), commonjs(), typescript({ tsconfig: './tsconfig.json' }), terser()]
   },
-  {
-    input: 'src/empty.js',
-    plugins: [
-      copy({
-        targets: [
-          { src: 'manifest.json', dest: 'dist/' },
-          { src: 'public/*', dest: 'dist/' }
-        ]
-      })
-    ]
-  }
 ];

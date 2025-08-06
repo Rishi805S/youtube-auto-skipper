@@ -1,21 +1,20 @@
 {
   "manifest_version": 3,
-  "name": "SponsorSkip",
-  "version": "0.1.0",
-  "description": "Auto-skip sponsor segments in YouTube videos",
-  "permissions": ["storage", "scripting", "activeTab"],
-  "host_permissions": ["*://*.youtube.com/*"],
+  "name": "YouTube Sponsor Skipper",
+  "version": "1.0.0",
+  "permissions": ["activeTab"],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "https://sponsor.ajay.app/*"
+  ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "dist/background.js"
   },
   "content_scripts": [
     {
-      "matches": ["*://*.youtube.com/*"],
-      "js": ["content.js"],
+      "matches": ["*://*.youtube.com/watch*"],
+      "js": ["dist/content.js"],
       "run_at": "document_idle"
     }
-  ],
-  "action": {
-    "default_title": "SponsorSkip"
-  }
+  ]
 }
