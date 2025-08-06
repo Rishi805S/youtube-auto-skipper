@@ -4,9 +4,7 @@
   "version": "0.1.0",
   "description": "Auto-skip sponsor segments in YouTube videos",
   "permissions": ["storage", "scripting", "activeTab"],
-  "host_permissions": [
-    "*://*.youtube.com/*"
-  ],
+  "host_permissions": ["*://*.youtube.com/*"],
   "background": {
     "service_worker": "background.js"
   },
