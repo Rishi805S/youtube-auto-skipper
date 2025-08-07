@@ -6,7 +6,7 @@ export const MESSAGE_TYPES = {
   TRANSCRIPT_JSON: 'SPONSORSKIP_TRANSCRIPT_JSON',
 } as const;
 
-type MessageType = typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYPES];
+type MessageType = (typeof MESSAGE_TYPES)[keyof typeof MESSAGE_TYPES];
 
 // Helper to post from page → content
 export function postToPage<T>(type: MessageType, payload: T) {
@@ -14,10 +14,7 @@ export function postToPage<T>(type: MessageType, payload: T) {
 }
 
 // Helper to listen in content/background
-export function listen<T>(
-  type: MessageType,
-  handler: (payload: T) => void
-) {
+export function listen<T>(type: MessageType, handler: (payload: T) => void) {
   const listener = (e: MessageEvent) => {
     if (e.source !== window) return;
     if (e.data?.type === type) {

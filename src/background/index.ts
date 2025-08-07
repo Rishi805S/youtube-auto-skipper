@@ -1,29 +1,20 @@
+import { InjectorService } from '../services/InjectorService';
+
+// This file is now clean and doesn't need ts-ignore or ts-expect-error.
+// The logic from previous steps was moved to other files.
+// This is the clean, final version.
+
 console.log('[SponsorSkip] Background script started.');
 
-function getPageData() {
-  const check = () => {
-    // @ts-ignore
-    if (window.ytcfg && window.ytcfg.data_) {
-      const payload = {
-        // @ts-ignore
-        apiKey: window.ytcfg.data_.INNERTUBE_API_KEY,
-        // @ts-ignore
-        context: window.ytcfg.data_.INNERTUBE_CONTEXT
-      };
-      window.postMessage({ type: 'SPONSORSKIP_YTCFG', payload }, '*');
-    } else {
-      setTimeout(check, 50);
-    }
-  };
-  check();
-}
+chrome.webNavigation.onHistoryStateUpdated.addListener(
+  (details) => {
+    if (details.url && details.url.includes('youtube.com')) {
+      console.log(`[BG] Navigated to a video page. Injecting script into tab: ${details.tabId}`);
 
-chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
-  if (details.url && details.url.includes("youtube.com")) {
-    console.log(`[BG] Navigated to video. Injecting script into tab: ${details.tabId}`);
-    chrome.scripting.executeScript({
-      target: { tabId: details.tabId },
-      func: getPageData,
-    }).catch(err => console.error('[BG] executeScript error:', err));
+      InjectorService.injectTrackUrlFetcher(details.tabId);
+    }
+  },
+  {
+    url: [{ hostContains: 'youtube.com/*' }],
   }
-}, { url: [{ hostContains: 'youtube.com/*' }] });
+);

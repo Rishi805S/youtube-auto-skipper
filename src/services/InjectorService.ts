@@ -1,50 +1,41 @@
-// src/services/InjectorService.ts
+// Unused imports have been removed.
 
-import { MESSAGE_TYPES, postToPage } from '../utils/MessageBridge';
-/**
- * Injects into the page MAIN world, polls for ytInitialPlayerResponse,
- * and once found posts the best caption-track URL back to the content script.
- */
-// src/services/InjectorService.ts
+interface CaptionTrack {
+  baseUrl: string;
+  kind?: string;
+  languageCode: string;
+}
 
 export class InjectorService {
-    static injectTrackUrlFetcher(tabId: number) {
-        return chrome.scripting.executeScript({
-            target: { tabId },
-            world: 'MAIN',
-            func: () => {
-                console.log('[INJ] injected into MAIN world');
+  static injectTrackUrlFetcher(tabId: number) {
+    return chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: () => {
+        const postToPage = (type: string, payload: unknown) => {
+          window.postMessage({ type, payload }, '*');
+        };
 
-                const waitForTracks = () => {
-                    // YouTube’s player response in page context
-                    // @ts-ignore
-                    const resp = (window as any).ytInitialPlayerResponse;
-                    const tl = resp?.captions?.playerCaptionsTracklistRenderer;
-                    if (tl) {
-                        console.log('[INJ] tracklistRenderer found:', tl);
-                        const tracks = tl.captionTracks;
-                        const best = tracks.find((t: any) => t.kind === 'asr' && t.languageCode === 'en')
-                            ?? tracks.find((t: any) => t.languageCode === 'en')
-                            ?? tracks[0];
+        const waitForTracks = () => {
+          // @ts-expect-error - ytInitialPlayerResponse is on the window but not in the default type
+          const resp = window.ytInitialPlayerResponse;
+          const tl = resp?.captions?.playerCaptionsTracklistRenderer;
+          if (tl) {
+            const tracks = tl.captionTracks as CaptionTrack[];
+            const best =
+              tracks.find((t) => t.kind === 'asr' && t.languageCode === 'en') ??
+              tracks.find((t) => t.languageCode === 'en') ??
+              tracks[0];
 
-                        const url = best.baseUrl + '&fmt=json3';
-                        console.log('[INJ] posting TRACK_URL:', url);
-                        window.postMessage(
-                            {
-                                type: 'SPONSORSKIP_TRACK_URL',
-                                payload: url, // The trackUrl you found
-                            },
-                            '*'
-                        );
-                    } else {
-                        // keep polling every 50ms
-                        setTimeout(waitForTracks, 50);
-                    }
-                };
-                waitForTracks();
+            if (best) {
+              postToPage('SPONSORSKIP_TRACK_URL', best.baseUrl + '&fmt=json3');
             }
-        }).catch(err => {
-            console.error('[INJ] injection failed', err);
-        });
-    }
+          } else {
+            setTimeout(waitForTracks, 50);
+          }
+        };
+        waitForTracks();
+      },
+    });
+  }
 }

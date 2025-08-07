@@ -34,7 +34,6 @@ export class TranscriptFetcher {
         const data = JSON.parse(raw);
         // forward the raw JSON payload
         postToPage(MESSAGE_TYPES.TRANSCRIPT_JSON, data);
-
       } catch (err) {
         console.error('[TF] fetch/parsing error:', err);
         postToPage(MESSAGE_TYPES.TRANSCRIPT_JSON, null);

@@ -2,11 +2,9 @@ console.log('[SponsorSkip] DEBUG Content script loaded.');
 
 async function openTranscriptPanel(): Promise<void> {
   console.log('[DEBUG] 1. Starting openTranscriptPanel...');
-  
+
   // Step 1: Find and click the "...more" button in the description
-  const descriptionMoreBtn = document.querySelector<HTMLElement>(
-    '#expand'
-  );
+  const descriptionMoreBtn = document.querySelector<HTMLElement>('#expand');
 
   if (!descriptionMoreBtn) {
     throw new Error('Debug Fail: "...more" button in description not found.');
@@ -16,7 +14,7 @@ async function openTranscriptPanel(): Promise<void> {
   console.log('[DEBUG] 3. Clicked description "...more" button.');
 
   // Wait for the description to expand
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 
   // Step 2: Find and click the "Show transcript" button
   console.log('[DEBUG] 4. Looking for "Show transcript" button in description...');
@@ -44,7 +42,9 @@ async function scrapeTranscriptText(): Promise<string> {
         resolve(el);
       } else if (performance.now() - start > 5000) {
         obs.disconnect();
-        reject(new Error('Debug Fail: Transcript panel did not appear in the DOM after 5 seconds.'));
+        reject(
+          new Error('Debug Fail: Transcript panel did not appear in the DOM after 5 seconds.')
+        );
       }
     });
     console.log('[DEBUG] Watching for transcript panel to be added to the page...');
@@ -54,9 +54,13 @@ async function scrapeTranscriptText(): Promise<string> {
   const segments = panel.querySelectorAll<HTMLElement>('ytd-transcript-segment-renderer');
   console.log(`[DEBUG] 9. Found ${segments.length} segment elements in the panel.`);
   const lines: string[] = [];
-  segments.forEach(seg => {
-    const time = seg.querySelector<HTMLElement>('.ytd-transcript-segment-renderer')?.innerText.trim();
-    const text = seg.querySelector<HTMLElement>('.ytd-transcript-segment-renderer')?.innerText.trim();
+  segments.forEach((seg) => {
+    const time = seg
+      .querySelector<HTMLElement>('.ytd-transcript-segment-renderer')
+      ?.innerText.trim();
+    const text = seg
+      .querySelector<HTMLElement>('.ytd-transcript-segment-renderer')
+      ?.innerText.trim();
     if (text) lines.push(`${time ?? ''} ${text}`.trim());
   });
 
@@ -68,7 +72,10 @@ async function retrieveTranscriptViaUI(): Promise<void> {
   try {
     await openTranscriptPanel();
     const transcript = await scrapeTranscriptText();
-    console.log('✅ [SponsorSkip] SUCCESS! Extracted transcript (first 500 chars):\n', transcript.slice(0, 500));
+    console.log(
+      '✅ [SponsorSkip] SUCCESS! Extracted transcript (first 500 chars):\n',
+      transcript.slice(0, 500)
+    );
   } catch (err) {
     console.error('❌ [SponsorSkip] FATAL ERROR during UI scrape:', err);
   }
