@@ -1,19 +1,20 @@
-import { SponsorBlockService } from './SponsorBlockService';
+import { InjectorService } from '../services/InjectorService';
 
-const sb = new SponsorBlockService();
+// This file is now clean and doesn't need ts-ignore or ts-expect-error.
+// The logic from previous steps was moved to other files.
+// This is the clean, final version.
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.type !== 'GET_SPONSOR_SEGMENTS') return;
+console.log('[SponsorSkip] Background script started.');
 
-  console.log('[BG] GET_SPONSOR_SEGMENTS for', msg.videoId);
+chrome.webNavigation.onHistoryStateUpdated.addListener(
+  (details) => {
+    if (details.url && details.url.includes('youtube.com')) {
+      console.log(`[BG] Navigated to a video page. Injecting script into tab: ${details.tabId}`);
 
-  sb.fetchSegments(msg.videoId)
-    .then((segments) => sendResponse({ segments }))
-    .catch((err) => {
-      console.error('[BG] SponsorBlock error', err);
-      sendResponse({ segments: [] });
-    });
-
-  // Keep channel open for async sendResponse
-  return true;
-});
+      InjectorService.injectTrackUrlFetcher(details.tabId);
+    }
+  },
+  {
+    url: [{ hostContains: 'youtube.com/*' }],
+  }
+);
