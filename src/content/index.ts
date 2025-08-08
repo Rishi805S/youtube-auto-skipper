@@ -1,14 +1,6 @@
-console.log('[SponsorSkip] Content script loaded.');
+import { SmartDetectService, Segment, Cue } from '../services/SmartDetectService';
 
-// --- TYPE DEFINITIONS ---
-interface Cue {
-  start: number; // seconds
-  text: string;
-}
-interface Segment {
-  start: number;
-  end: number;
-}
+console.log('[SponsorSkip] Content script loaded.');
 
 // --- MODULE 1: UI INTERACTION ---
 async function openTranscriptPanel(): Promise<void> {
@@ -22,6 +14,7 @@ async function openTranscriptPanel(): Promise<void> {
 }
 
 // --- MODULE 2: PARSING ---
+// --- MODULE 2: PARSING ---
 function parseTranscriptPanel(): Cue[] {
   const panel = document.querySelector<HTMLElement>('ytd-transcript-renderer');
   if (!panel) return [];
@@ -29,10 +22,10 @@ function parseTranscriptPanel(): Cue[] {
   const segs = panel.querySelectorAll<HTMLElement>('ytd-transcript-segment-renderer');
 
   const cues: Cue[] = Array.from(segs).map((seg) => {
-    // Use the correct class names you found to select the elements
+    // THE FIX: Use the correct class names you found
     const tEl = seg.querySelector<HTMLElement>('.segment-timestamp');
     const txtEl = seg.querySelector<HTMLElement>('.segment-text');
-
+    
     const ts = tEl?.innerText.trim() || '0:00';
     const parts = ts.split(':').map((n) => Number(n));
     // Converts "1:23" into 83 seconds
@@ -49,34 +42,10 @@ function parseTranscriptPanel(): Cue[] {
   return cues;
 }
 
-// --- MODULE 3: DETECTION ---
-function detectSponsorSegments(cues: Cue[]): Segment[] {
-  const keywords = /\bsponsor|ad|promo|thanks to\b/i;
-  const flagged = cues.map((c) => keywords.test(c.text));
-  const segments: Segment[] = [];
-  let segStart: number | null = null;
-
-  for (let i = 0; i < cues.length; i++) {
-    if (flagged[i] && segStart === null) {
-      segStart = cues[i].start - 2; // 2s padding
-    }
-    if ((!flagged[i] || i === cues.length - 1) && segStart !== null) {
-      const endTime = (i < cues.length - 1 ? cues[i + 1].start : cues[i].start) + 2;
-      segments.push({
-        start: Math.max(segStart, 0),
-        end: endTime,
-      });
-      segStart = null;
-    }
-  }
-  console.log('[CS] Detected', segments.length, 'sponsor segments:', segments);
-  return segments;
-}
-
-// --- MODULE 4: SKIPPING ---
+// --- MODULE 3: SKIPPING ---
 class SegmentSkipper {
   private segments: Segment[];
-  private skipped = new Set<number>(); // indices of segments already skipped
+  private skipped = new Set<number>();
 
   constructor(segments: Segment[]) {
     this.segments = segments;
@@ -102,27 +71,68 @@ class SegmentSkipper {
 
 // --- MAIN ORCHESTRATOR ---
 async function main() {
+  const video = document.querySelector<HTMLVideoElement>('video');
+  if (!video) {
+    console.error('[SponsorSkip] Video element not found.');
+    return;
+  }
+
+  // Pause the video immediately
+  console.log('[SponsorSkip] Pausing video for transcript scrape...');
+  video.pause();
+
   try {
-    console.log('[CS] Starting transcript UI scrape...');
     await openTranscriptPanel();
-    // Wait for the panel to be populated
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 2000)); // Wait for panel
 
     const cues = parseTranscriptPanel();
-    const segments = detectSponsorSegments(cues);
+    
+    const detector = new SmartDetectService();
+    const segments = detector.detectSegments(cues);
 
     if (segments.length) {
       new SegmentSkipper(segments);
-      console.log('[SponsorSkip] Sponsor-skipping activated.');
+      console.log('[SponsorSkip] Smart sponsor-skipping activated');
     } else {
-      console.log('[SponsorSkip] No sponsor segments found to skip.');
+      console.log('[SponsorSkip] No sponsor segments detected');
     }
   } catch (err) {
     console.error('[CS] Main process failed:', err);
+  } finally {
+    console.log('[SponsorSkip] Resuming video playback...');
+    video.play();
   }
 }
 
-window.addEventListener('yt-navigate-finish', () => {
-  // A delay is needed to ensure the page buttons are in the DOM
-  setTimeout(main, 2000);
-});
+// --- NEW, ROBUST TRIGGER LOGIC ---
+
+// This function will be called to start our process
+function initialize() {
+  console.log('[SponsorSkip] Initializing observer...');
+
+  // Use a MutationObserver to wait for the video element to be available
+  const observer = new MutationObserver((mutations, obs) => {
+    const video = document.querySelector('video');
+    if (video) {
+      console.log('[SponsorSkip] Video element found. Starting main logic.');
+      main(); // Call the main function
+      obs.disconnect(); // Stop observing once we've found it
+    }
+  });
+
+  // Start observing the body for changes
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+}
+
+// This handles SPA navigations within YouTube
+window.addEventListener('yt-navigate-finish', initialize);
+
+// This handles initial page loads and hard refreshes
+if (document.body) {
+  initialize();
+} else {
+  document.addEventListener('DOMContentLoaded', initialize);
+}
