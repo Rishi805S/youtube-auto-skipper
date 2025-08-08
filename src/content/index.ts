@@ -25,7 +25,7 @@ function parseTranscriptPanel(): Cue[] {
     // THE FIX: Use the correct class names you found
     const tEl = seg.querySelector<HTMLElement>('.segment-timestamp');
     const txtEl = seg.querySelector<HTMLElement>('.segment-text');
-    
+
     const ts = tEl?.innerText.trim() || '0:00';
     const parts = ts.split(':').map((n) => Number(n));
     // Converts "1:23" into 83 seconds
@@ -86,7 +86,7 @@ async function main() {
     await new Promise((r) => setTimeout(r, 2000)); // Wait for panel
 
     const cues = parseTranscriptPanel();
-    
+
     const detector = new SmartDetectService();
     const segments = detector.detectSegments(cues);
 

@@ -1,28 +1,25 @@
 // src/services/SmartDetectService.ts
 
 export interface Cue {
-  start: number;    // seconds
-  text:  string;
+  start: number; // seconds
+  text: string;
 }
 
 export interface Segment {
-  start: number;    // seconds
-  end:   number;    // seconds
+  start: number; // seconds
+  end: number; // seconds
 }
 
 export class SmartDetectService {
-  private startRegex = /\b(sponsor|sponsored|sponsorship|sponsoring|brought to you by|thanks to)\b/i;
-  private endRegex   = /\b(now (let'?s|we)|back to|let'?s get started)\b/i;
+  private startRegex =
+    /\b(sponsor|sponsored|sponsorship|sponsoring|brought to you by|thanks to)\b/i;
+  private endRegex = /\b(now (let'?s|we)|back to|let'?s get started)\b/i;
   private maxDuration = 30; // default max sponsor block length in seconds
 
-  constructor(
-    startKeywords?: RegExp,
-    endKeywords?: RegExp,
-    maxDuration?: number
-  ) {
+  constructor(startKeywords?: RegExp, endKeywords?: RegExp, maxDuration?: number) {
     if (startKeywords) this.startRegex = startKeywords;
-    if (endKeywords)   this.endRegex   = endKeywords;
-    if (maxDuration)   this.maxDuration= maxDuration;
+    if (endKeywords) this.endRegex = endKeywords;
+    if (maxDuration) this.maxDuration = maxDuration;
   }
 
   detectSegments(cues: Cue[]): Segment[] {
