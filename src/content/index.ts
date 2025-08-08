@@ -1,20 +1,140 @@
-import { SmartDetectService, Segment, Cue } from '../services/SmartDetectService';
+import { Cue, Segment, SponsorBlockApiSegment } from '../types/types';
+import { SmartDetectService } from '../services/SmartDetectService';
 
 console.log('[SponsorSkip] Content script loaded.');
 
-// --- MODULE 1: UI INTERACTION ---
-async function openTranscriptPanel(): Promise<void> {
-  // Clicks the "...more" button in the description
-  document.querySelector<HTMLElement>('#expand')?.click();
-  await new Promise((r) => setTimeout(r, 500));
-  // Clicks the "Show transcript" button
-  document
-    .querySelector<HTMLButtonElement>('ytd-video-description-transcript-section-renderer button')
-    ?.click();
+// A robust click-with-retry helper
+async function clickWithRetry(selector: string, attempts = 5, delay = 300): Promise<void> {
+  for (let i = 0; i < attempts; i++) {
+    const btn = document.querySelector<HTMLElement>(selector);
+    if (btn) {
+      btn.click();
+      return;
+    }
+    await new Promise((r) => setTimeout(r, delay));
+  }
+  throw new Error(`Element not found after ${attempts} attempts: ${selector}`);
 }
 
-// --- MODULE 2: PARSING ---
-// --- MODULE 2: PARSING ---
+// --- TIER 1: SponsorBlock API ---
+
+async function fetchFromSponsorBlock(videoId: string): Promise<Segment[]> {
+  try {
+    const res = await fetch(`https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}`);
+    if (!res.ok) return [];
+
+    // Assert the JSON matches our interface
+    const data = (await res.json()) as SponsorBlockApiSegment[];
+
+    return data
+      .filter((seg) => seg.category === 'sponsor')
+      .map((seg) => ({
+        start: seg.segment[0],
+        end: seg.segment[1],
+      }));
+  } catch {
+    return [];
+  }
+}
+
+// --- TIER 2: CHAPTERS FROM DESCRIPTION ANCHORS ---
+
+// Matches “MM:SS” or “HH:MM:SS” anywhere in the text
+const TIME_RE = /(\d{1,2}(?::\d{2}){1,2})/;
+
+// convert “M:SS” or “H:MM:SS” → seconds
+function toSeconds(ts: string): number {
+  const parts = ts.split(':').map(Number);
+  if (parts.length === 3) {
+    const [h, m, s] = parts;
+    return h * 3600 + m * 60 + s;
+  }
+  const [m, s] = parts;
+  return m * 60 + s;
+}
+
+// Poll until the selector shows up (or timeout)
+// async function waitForSelector(selector: string, timeout = 2000, interval = 50): Promise<void> {
+//   const start = Date.now();
+//   while (!document.querySelector(selector)) {
+//     if (Date.now() - start > timeout) break;
+//     await new Promise((r) => setTimeout(r, interval));
+//   }
+// }
+
+// Main Tier 2 entry point
+async function findChaptersFromDescriptionDom(): Promise<Segment[]> {
+  console.log('[Tier 2] Expanding description…');
+  await clickWithRetry('#expand');
+  await new Promise((r) => setTimeout(r, 200)); // let YT render
+
+  // grab ALL anchors under #description
+  const all = Array.from(document.querySelectorAll<HTMLAnchorElement>('#description a'));
+  console.log('[Tier 2] Total anchors:', all.length);
+
+  // pick only those whose text contains a timestamp
+  const tsAnchors = all.filter((a) => TIME_RE.test(a.textContent!));
+  console.log('[Tier 2] Anchors with timestamps in text:', tsAnchors.length);
+
+  if (!tsAnchors.length) {
+    console.warn('[Tier 2] No timestamp‐text anchors found');
+    return [];
+  }
+
+  // Map each to { start, end, title }
+  const video = document.querySelector<HTMLVideoElement>('video')!;
+  const duration = video.duration;
+  const cues = tsAnchors.map((a, idx) => {
+    // pull out the ts from the text
+    const txt = a.textContent!.trim();
+    const m = txt.match(TIME_RE)!;
+    const start = toSeconds(m[1]);
+
+    // next anchor’s timestamp → end
+    const next = tsAnchors[idx + 1];
+    const end = next ? toSeconds(next.textContent!.match(TIME_RE)![1]) : duration;
+
+    // derive title:
+    // 1) look for a sibling <a> that has NO timestamp
+    let title = '';
+    const maybeTitleA = a.nextElementSibling as HTMLAnchorElement | null;
+    if (maybeTitleA && !TIME_RE.test(maybeTitleA.textContent!)) {
+      title = maybeTitleA.textContent!.trim();
+    } else {
+      // 2) fallback: take the first non‐timestamp line
+      const lines = txt
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l && !TIME_RE.test(l));
+      title = lines[0] || '';
+    }
+
+    return { start, end, title };
+  });
+
+  // filter only “Sponsor”
+  const sponsorCues = cues.filter((c) => /sponsor/i.test(c.title));
+  console.log('[Tier 2] Sponsor cues:', sponsorCues);
+
+  // return just start/end
+  return sponsorCues.map(({ start, end }) => ({ start, end }));
+}
+
+// --- TIER 3: Transcript Heuristics ---
+async function openTranscriptPanel(): Promise<void> {
+  await clickWithRetry('#expand');
+  await clickWithRetry('ytd-video-description-transcript-section-renderer button');
+}
+
+async function waitForTranscriptPanel(timeout = 3000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    if (document.querySelector('ytd-transcript-renderer')) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('Transcript panel did not appear');
+}
+
 function parseTranscriptPanel(): Cue[] {
   const panel = document.querySelector<HTMLElement>('ytd-transcript-renderer');
   if (!panel) return [];
@@ -22,117 +142,130 @@ function parseTranscriptPanel(): Cue[] {
   const segs = panel.querySelectorAll<HTMLElement>('ytd-transcript-segment-renderer');
 
   const cues: Cue[] = Array.from(segs).map((seg) => {
-    // THE FIX: Use the correct class names you found
     const tEl = seg.querySelector<HTMLElement>('.segment-timestamp');
     const txtEl = seg.querySelector<HTMLElement>('.segment-text');
-
-    const ts = tEl?.innerText.trim() || '0:00';
-    const parts = ts.split(':').map((n) => Number(n));
-    // Converts "1:23" into 83 seconds
+    const ts = tEl?.innerText.trim() ?? '0:00';
+    const parts = ts.split(':').map(Number);
     const start =
       parts.length === 2 ? parts[0] * 60 + parts[1] : parts[0] * 3600 + parts[1] * 60 + parts[2];
-
-    return {
-      start,
-      text: txtEl?.innerText.trim() || '',
-    };
+    return { start, text: txtEl?.innerText.trim() ?? '' };
   });
 
-  console.log('[CS] Parsed', cues.length, 'cues from panel. First cue:', cues[0]);
+  console.log('[CS] Parsed', cues.length, 'cues from panel.');
   return cues;
 }
 
-// --- MODULE 3: SKIPPING ---
+async function getSegmentsViaTranscriptHeuristics(): Promise<Segment[]> {
+  try {
+    await openTranscriptPanel();
+    await waitForTranscriptPanel();
+    await new Promise((r) => setTimeout(r, 500));
+    const cues = parseTranscriptPanel();
+    return new SmartDetectService().detectSegments(cues);
+  } catch (err) {
+    console.error('[Skip] Transcript heuristics failed:', err);
+    return [];
+  }
+}
+
+// --- SKIPPER CLASS ---
 class SegmentSkipper {
-  private segments: Segment[];
   private skipped = new Set<number>();
 
-  constructor(segments: Segment[]) {
-    this.segments = segments;
+  constructor(private segments: Segment[]) {
     this.attach();
   }
 
-  private attach() {
+  private attach(): void {
     const video = document.querySelector<HTMLVideoElement>('video');
-    if (!video) return console.error('[Skipper] No <video> found');
+    if (!video) {
+      console.error('[Skipper] No <video> found');
+      return;
+    }
 
     video.addEventListener('timeupdate', () => {
       const t = video.currentTime;
-      this.segments.forEach((seg, i) => {
+      for (let i = 0; i < this.segments.length; i++) {
+        const seg = this.segments[i];
         if (!this.skipped.has(i) && t >= seg.start && t < seg.end) {
           console.log(`[Skipper] Jumping from ${t.toFixed(1)}s → ${seg.end.toFixed(1)}s`);
-          video.currentTime = seg.end;
           this.skipped.add(i);
+          video.currentTime = seg.end;
+          break;
         }
-      });
+      }
     });
   }
 }
 
 // --- MAIN ORCHESTRATOR ---
-async function main() {
-  const video = document.querySelector<HTMLVideoElement>('video');
-  if (!video) {
-    console.error('[SponsorSkip] Video element not found.');
-    return;
-  }
+async function main(): Promise<void> {
+  const videoId = new URLSearchParams(location.search).get('v') ?? '';
+  if (!videoId) return;
 
-  // Pause the video immediately
-  console.log('[SponsorSkip] Pausing video for transcript scrape...');
-  video.pause();
+  const video = document.querySelector<HTMLVideoElement>('video');
+  video?.pause();
+
+  let segments: Segment[] = [];
 
   try {
-    await openTranscriptPanel();
-    await new Promise((r) => setTimeout(r, 2000)); // Wait for panel
+    // Tier 1 (uncomment to enable):
+    segments = await fetchFromSponsorBlock(videoId);
 
-    const cues = parseTranscriptPanel();
+    // Tier 2: Description‐based chapters
+    if (segments.length === 0) {
+      console.log('[SponsorSkip] Invoking Tier 2 description parser...');
+      segments = await findChaptersFromDescriptionDom();
+      console.log('[SponsorSkip] Tier 2 returned segments:', segments);
 
-    const detector = new SmartDetectService();
-    const segments = detector.detectSegments(cues);
+      if (segments.length) {
+        console.log('[SponsorSkip] Found sponsor chapters via description 🎉');
+      } else {
+        console.log('[SponsorSkip] No chapters in description. Will try transcript.');
+      }
+    }
 
+    // Tier 3: Transcript heuristics (only if Tier 2 gave nothing)
+    if (segments.length === 0) {
+      console.log('[SponsorSkip] Falling back to transcript heuristics');
+      segments = await getSegmentsViaTranscriptHeuristics();
+      console.log('[SponsorSkip] Tier 3 returned segments:', segments);
+    }
+
+    // Activate skipper if any segments found
     if (segments.length) {
       new SegmentSkipper(segments);
-      console.log('[SponsorSkip] Smart sponsor-skipping activated');
+      console.log('[Skip] Activated skipper with segments:', segments);
     } else {
-      console.log('[SponsorSkip] No sponsor segments detected');
+      console.log('[Skip] No sponsor segments detected.');
     }
   } catch (err) {
-    console.error('[CS] Main process failed:', err);
+    console.error('[Skip] Unexpected error in main():', err);
   } finally {
-    console.log('[SponsorSkip] Resuming video playback...');
-    video.play();
+    video?.play();
   }
 }
 
-// --- NEW, ROBUST TRIGGER LOGIC ---
-
-// This function will be called to start our process
-function initialize() {
-  console.log('[SponsorSkip] Initializing observer...');
-
-  // Use a MutationObserver to wait for the video element to be available
-  const observer = new MutationObserver((mutations, obs) => {
-    const video = document.querySelector('video');
-    if (video) {
+// --- INITIALIZATION & SPA HANDLING ---
+function initialize(): void {
+  console.log('[SponsorSkip] Initializing...');
+  const observer = new MutationObserver((_, obs) => {
+    if (document.querySelector('video')) {
       console.log('[SponsorSkip] Video element found. Starting main logic.');
-      main(); // Call the main function
-      obs.disconnect(); // Stop observing once we've found it
+      main();
+      obs.disconnect();
     }
   });
 
-  // Start observing the body for changes
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-  });
+  observer.observe(document.body, { childList: true, subtree: true });
 }
 
-// This handles SPA navigations within YouTube
-window.addEventListener('yt-navigate-finish', initialize);
+// SPA navigation event on YouTube
+window.addEventListener('yt-navigate-finish', initialize as EventListener);
 
-// This handles initial page loads and hard refreshes
-if (document.body) {
-  initialize();
-} else {
+// Initial page load or hard refresh
+if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initialize);
+} else {
+  initialize();
 }

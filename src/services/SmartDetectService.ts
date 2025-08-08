@@ -1,12 +1,5 @@
-export interface Cue {
-  start: number; // seconds
-  text: string;
-}
-
-export interface Segment {
-  start: number; // seconds
-  end: number; // seconds
-}
+// Import from our new central types file
+import { Cue, Segment } from '../types/types';
 
 export class SmartDetectService {
   private startRegex =
