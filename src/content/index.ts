@@ -53,15 +53,6 @@ function toSeconds(ts: string): number {
   return m * 60 + s;
 }
 
-// Poll until the selector shows up (or timeout)
-// async function waitForSelector(selector: string, timeout = 2000, interval = 50): Promise<void> {
-//   const start = Date.now();
-//   while (!document.querySelector(selector)) {
-//     if (Date.now() - start > timeout) break;
-//     await new Promise((r) => setTimeout(r, interval));
-//   }
-// }
-
 // Main Tier 2 entry point
 async function findChaptersFromDescriptionDom(): Promise<Segment[]> {
   console.log('[Tier 2] Expanding description…');
