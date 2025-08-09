@@ -1,7 +1,5 @@
 import { Segment } from '../types/types';
-import { fetchSponsorBlockSegments } from '../api/SponsorBlockClient';
-import { scrapeChapterSegments } from '../pipeline/chapterScraper';
-import { parseTranscriptSegments } from '../pipeline/transcriptParser';
+import { getSegmentsByPriority } from '../engine/tieredFetcher';
 
 console.log('[SponsorSkip] Content script loaded.');
 
@@ -43,33 +41,8 @@ async function main(): Promise<void> {
   const video = document.querySelector<HTMLVideoElement>('video');
   video?.pause();
 
-  let segments: Segment[] = [];
-
   try {
-    // Tier 1
-    segments = await fetchSponsorBlockSegments(videoId);
-
-    // Tier 2: Description‐based chapters
-    if (segments.length === 0) {
-      console.log('[SponsorSkip] Invoking Tier 2 description parser...');
-      segments = await scrapeChapterSegments();
-      console.log('[SponsorSkip] Tier 2 returned segments:', segments);
-
-      if (segments.length) {
-        console.log('[SponsorSkip] Found sponsor chapters via description 🎉');
-      } else {
-        console.log('[SponsorSkip] No chapters in description. Will try transcript.');
-      }
-    }
-
-    // Tier 3: Transcript heuristics (only if Tier 2 gave nothing)
-    if (segments.length === 0) {
-      console.log('[SponsorSkip] Falling back to transcript heuristics');
-      segments = await parseTranscriptSegments();
-      console.log('[SponsorSkip] Tier 3 returned segments:', segments);
-    }
-
-    // Activate skipper if any segments found
+    const segments = await getSegmentsByPriority(videoId);
     if (segments.length) {
       new SegmentSkipper(segments);
       console.log('[Skip] Activated skipper with segments:', segments);

@@ -7,7 +7,7 @@ export class SmartDetectService {
 
   // ✅ Expanded list of end keywords, including your suggestions
   private endRegex =
-    /\b(now (let'?s|we)|back to|let'?s get started|check out|links in the description|in the description below)\b/i;
+    /\b(now (let'?s|we)|back to|let'?s get started|check out|links? in (the )?description|in (the )?description below|see (the )?description)\b/i;
 
   private maxDuration = 45; // Default max sponsor block length in seconds
 
@@ -30,7 +30,7 @@ export class SmartDetectService {
         // ✅ Increased lookahead from 5 to 20 cues
         for (let j = i + 1; j < Math.min(cues.length, i + 21); j++) {
           if (this.endRegex.test(cues[j].text)) {
-            endTime = cues[j].start + 4;
+            endTime = cues[j + 1] ? cues[j + 1].start : cues[j].start + 2; // fallback to a small offset if no next cue
             console.log(`[SmartDetect] Found a clear end cue: "${cues[j].text}"`);
             break;
           }

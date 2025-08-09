@@ -7,6 +7,7 @@ export interface Cue {
 export interface Segment {
   start: number; // seconds
   end: number; // seconds
+  category?: string; // optional for flexibility
 }
 
 // src/types/types.ts (or a new file)
