@@ -8,10 +8,9 @@ export default [
     output: {
       file: 'dist/background.js',
       format: 'iife',
+      sourcemap: process.env.NODE_ENV !== 'production',
     },
-    plugins: [
-      typescript({ tsconfig: './tsconfig.json' }),
-    ],
+    plugins: [typescript({ tsconfig: './tsconfig.json' })],
   },
   // Build the content script
   {
@@ -19,10 +18,9 @@ export default [
     output: {
       file: 'dist/content.js',
       format: 'iife',
+      sourcemap: process.env.NODE_ENV !== 'production',
     },
-    plugins: [
-      typescript({ tsconfig: './tsconfig.json' }),
-    ],
+    plugins: [typescript({ tsconfig: './tsconfig.json' })],
   },
   // This part handles copying static files
   {
@@ -36,11 +34,13 @@ export default [
           { src: 'public', dest: 'dist/' },
         ],
         copyOnce: true,
+        hook: 'writeBundle',
+        verbose: true,
       }),
     ],
     // Rollup requires an output, even for a dummy entry
     output: {
-        file: 'dist/dummy.js'
-    }
+      file: 'dist/dummy.js',
+    },
   },
 ];

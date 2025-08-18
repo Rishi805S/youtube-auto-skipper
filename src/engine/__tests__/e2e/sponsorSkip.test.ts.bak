@@ -1,0 +1,105 @@
+import { test, expect, type Page, type ConsoleMessage } from '@playwright/test';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Test videos with known sponsor segments
+const VIDEO_WITH_CHAPTERS = '_ANrF3FJm7I';    // Video with explicit sponsor chapters
+const VIDEO_WITHOUT_CHAPTERS = 'YrxhVA5NVQ4';  // Video with sponsors but no chapters
+
+test.describe('YouTube Sponsor Detection', () => {
+  test.beforeEach(async ({ page }) => {
+    // Mock Chrome extension APIs
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'chrome', {
+        value: {
+          runtime: {
+            sendMessage: () => Promise.resolve(),
+            onMessage: { addListener: () => {} },
+            getManifest: () => ({ version: '1.0.0' })
+          },
+          storage: {
+            local: {
+              get: () => Promise.resolve({}),
+              set: () => Promise.resolve()
+            }
+          }
+        },
+        writable: true,
+        configurable: true
+      });
+    });
+
+    // Add content script via script tag to ensure it loads
+    await page.addInitScript(() => {
+      const script = document.createElement('script');
+      script.type = 'module';
+      script.textContent = `
+        import { getSegmentsByPriority } from '../../../../src/engine/tieredFetcher';
+        window.getSegmentsByPriority = getSegmentsByPriority;
+      `;
+      document.head.appendChild(script);
+    });
+  });
+
+async function checkVideoForSponsorDetection(page: Page, videoId: string, expectedTier: number) {
+  // Start collecting logs before navigation
+  const logs: string[] = [];
+  page.on('console', (msg: ConsoleMessage) => {
+    if (msg.type() === 'log') {
+      logs.push(msg.text());
+    }
+  });
+
+  // Navigate to the test video
+  await page.goto(`https://www.youtube.com/watch?v=${videoId}`, {
+    waitUntil: 'networkidle'
+  });
+
+  // Wait for video player and give time for extension to initialize
+  await page.waitForSelector('video', { state: 'attached' });
+  
+  // Helper function to check logs
+  const checkLogs = () => {
+    const tierLog = logs.some(log => log.includes(`[Fetch][Tier ${expectedTier}]`));
+    const skipLog = logs.some(log => log.includes('[Skip] Activated skipper'));
+    return { tierLog, skipLog, logs };
+  };
+
+  // Wait up to 15 seconds for logs (some videos might take longer to analyze)
+  let attempts = 0;
+  while (attempts < 15) {
+    const { tierLog, skipLog } = checkLogs();
+    if (tierLog && skipLog) break;
+    await page.waitForTimeout(1000);
+    attempts++;
+  }
+
+  return checkLogs();
+}
+
+test('SponsorSkip activates on video with explicit sponsor chapters', async ({ page }: { page: Page }) => {
+  const { tierLog, skipLog, logs } = await checkVideoForSponsorDetection(page, VIDEO_WITH_CHAPTERS, 1);
+  
+  expect(tierLog, 'Tier 1 (chapters) fetch should be logged').toBe(true);
+  expect(skipLog, 'Skipper activation should be logged').toBe(true);
+  
+  // Log all console output if the test fails
+  if (!tierLog || !skipLog) {
+    console.log('All logs:', logs.join('\n'));
+  }
+});
+
+test('SponsorSkip detects sponsors in video without chapters', async ({ page }: { page: Page }) => {
+  const { tierLog, skipLog, logs } = await checkVideoForSponsorDetection(page, VIDEO_WITHOUT_CHAPTERS, 2);
+  
+  expect(tierLog, 'Tier 2 (SponsorBlock) fetch should be logged').toBe(true);
+  expect(skipLog, 'Skipper activation should be logged').toBe(true);
+  
+  // Log all console output if the test fails
+  if (!tierLog || !skipLog) {
+    console.log('All logs:', logs.join('\n'));
+  }
+});

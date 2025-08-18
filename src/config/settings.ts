@@ -1,0 +1,19 @@
+export const CONFIG = {
+  TIMEOUTS: {
+    TRANSCRIPT_PANEL: 3000,
+    CLICK_RETRY: 300,
+  },
+  RETRY: {
+    MAX_ATTEMPTS: 5,
+  },
+  SEGMENTS: {
+    MIN_LENGTH: 10,
+    MAX_LENGTH: 180,
+    MERGE_PADDING: 2,
+  },
+  DETECTION: {
+    MIN_CONFIDENCE: 0.7,
+    START_PADDING: -2,
+    END_PADDING: 1,
+  },
+};

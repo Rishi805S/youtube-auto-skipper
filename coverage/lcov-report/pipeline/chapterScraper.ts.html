@@ -1,0 +1,346 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for pipeline/chapterScraper.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">pipeline</a> chapterScraper.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">3.92% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>2/51</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/18</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/11</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">4.44% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>2/45</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Segment } from '../types/types';
+&nbsp;
+// --- TIER 2: CHAPTERS FROM DESCRIPTION ANCHORS ---
+// A robust click-with-retry helper
+async function <span class="fstat-no" title="function not covered" >clickWithRetry(</span>selector: string, attempts = <span class="branch-0 cbranch-no" title="branch not covered" >5,</span> delay = <span class="branch-0 cbranch-no" title="branch not covered" >300)</span>: Promise&lt;void&gt; {
+<span class="cstat-no" title="statement not covered" >  for (let i = <span class="cstat-no" title="statement not covered" >0;</span> i &lt; attempts; i++) {</span>
+    const btn = <span class="cstat-no" title="statement not covered" >document.querySelector&lt;HTMLElement&gt;(selector);</span>
+<span class="cstat-no" title="statement not covered" >    if (btn) {</span>
+<span class="cstat-no" title="statement not covered" >      btn.click();</span>
+<span class="cstat-no" title="statement not covered" >      return;</span>
+    }
+<span class="cstat-no" title="statement not covered" >    await new Promise(<span class="fstat-no" title="function not covered" >(r</span>) =&gt; <span class="cstat-no" title="statement not covered" >setTimeout(r, delay))</span>;</span>
+  }
+<span class="cstat-no" title="statement not covered" >  throw new Error(`Element not found after ${attempts} attempts: ${selector}`);</span>
+}
+&nbsp;
+// Matches “MM:SS” or “HH:MM:SS” anywhere in the text
+const TIME_RE = /(\d{1,2}(?::\d{2}){1,2})/;
+&nbsp;
+// convert “M:SS” or “H:MM:SS” → seconds
+function <span class="fstat-no" title="function not covered" >toSeconds(</span>ts: string): number {
+  const parts = <span class="cstat-no" title="statement not covered" >ts.split(':').map(Number);</span>
+<span class="cstat-no" title="statement not covered" >  if (parts.length === 3) {</span>
+    const [h, m, s] = <span class="cstat-no" title="statement not covered" >parts;</span>
+<span class="cstat-no" title="statement not covered" >    return h * 3600 + m * 60 + s;</span>
+  }
+  const [m, s] = <span class="cstat-no" title="statement not covered" >parts;</span>
+<span class="cstat-no" title="statement not covered" >  return m * 60 + s;</span>
+}
+&nbsp;
+// Main Tier 2 entry point
+export async function <span class="fstat-no" title="function not covered" >scrapeChapterSegments(</span>): Promise&lt;Segment[]&gt; {
+<span class="cstat-no" title="statement not covered" >  console.log('[Tier 2] Expanding description…');</span>
+<span class="cstat-no" title="statement not covered" >  await clickWithRetry('#expand');</span>
+<span class="cstat-no" title="statement not covered" >  await new Promise(<span class="fstat-no" title="function not covered" >(r</span>) =&gt; <span class="cstat-no" title="statement not covered" >setTimeout(r, 200))</span>; </span>// let YT render
+&nbsp;
+  // grab ALL anchors under #description
+  const all = <span class="cstat-no" title="statement not covered" >Array.from(document.querySelectorAll&lt;HTMLAnchorElement&gt;('#description a'));</span>
+<span class="cstat-no" title="statement not covered" >  console.log('[Tier 2] Total anchors:', all.length);</span>
+&nbsp;
+  // pick only those whose text contains a timestamp
+  const tsAnchors = <span class="cstat-no" title="statement not covered" >all.filter(<span class="fstat-no" title="function not covered" >(a</span>) =&gt; <span class="cstat-no" title="statement not covered" >TIME_RE.test(a.textContent!))</span>;</span>
+<span class="cstat-no" title="statement not covered" >  console.log('[Tier 2] Anchors with timestamps in text:', tsAnchors.length);</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  if (!tsAnchors.length) {</span>
+<span class="cstat-no" title="statement not covered" >    console.warn('[Tier 2] No timestamp‐text anchors found');</span>
+<span class="cstat-no" title="statement not covered" >    return [];</span>
+  }
+&nbsp;
+  // Map each to { start, end, title }
+  const video = <span class="cstat-no" title="statement not covered" >document.querySelector&lt;HTMLVideoElement&gt;('video')!;</span>
+  const duration = <span class="cstat-no" title="statement not covered" >video.duration;</span>
+  const cues = <span class="cstat-no" title="statement not covered" >tsAnchors.map(<span class="fstat-no" title="function not covered" >(a</span>, idx) =&gt; {</span>
+    // pull out the ts from the text
+    const txt = <span class="cstat-no" title="statement not covered" >a.textContent!.trim();</span>
+    const m = <span class="cstat-no" title="statement not covered" >txt.match(TIME_RE)!;</span>
+    const start = <span class="cstat-no" title="statement not covered" >toSeconds(m[1]);</span>
+&nbsp;
+    // next anchor’s timestamp → end
+    const next = <span class="cstat-no" title="statement not covered" >tsAnchors[idx + 1];</span>
+    const end = <span class="cstat-no" title="statement not covered" >next ? toSeconds(next.textContent!.match(TIME_RE)![1]) : duration;</span>
+&nbsp;
+    // derive title:
+    // 1) look for a sibling &lt;a&gt; that has NO timestamp
+    let title = <span class="cstat-no" title="statement not covered" >'';</span>
+    const maybeTitleA = <span class="cstat-no" title="statement not covered" >a.nextElementSibling as HTMLAnchorElement | null;</span>
+<span class="cstat-no" title="statement not covered" >    if (maybeTitleA &amp;&amp; !TIME_RE.test(maybeTitleA.textContent!)) {</span>
+<span class="cstat-no" title="statement not covered" >      title = maybeTitleA.textContent!.trim();</span>
+    } else {
+      // 2) fallback: take the first non‐timestamp line
+      const lines = <span class="cstat-no" title="statement not covered" >txt</span>
+        .split('\n')
+        .map(<span class="fstat-no" title="function not covered" >(l</span>) =&gt; <span class="cstat-no" title="statement not covered" >l.trim())</span>
+        .filter(<span class="fstat-no" title="function not covered" >(l</span>) =&gt; <span class="cstat-no" title="statement not covered" >l &amp;&amp; !TIME_RE.test(l))</span>;
+<span class="cstat-no" title="statement not covered" >      title = lines[0] || '';</span>
+    }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    return { start, end, title };</span>
+  });
+&nbsp;
+  // filter only “Sponsor”
+  const sponsorCues = <span class="cstat-no" title="statement not covered" >cues.filter(<span class="fstat-no" title="function not covered" >(c</span>) =&gt; <span class="cstat-no" title="statement not covered" >/sponsor/i.test(c.title))</span>;</span>
+<span class="cstat-no" title="statement not covered" >  console.log('[Tier 2] Sponsor cues:', sponsorCues);</span>
+&nbsp;
+  // return just start/end
+<span class="cstat-no" title="statement not covered" >  return sponsorCues.map(<span class="fstat-no" title="function not covered" >({</span> start, end }) =&gt; (<span class="cstat-no" title="statement not covered" >{ start, end })</span>);</span>
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2025-08-09T13:35:21.707Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    

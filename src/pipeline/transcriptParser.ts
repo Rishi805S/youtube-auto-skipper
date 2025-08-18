@@ -51,9 +51,11 @@ export async function parseTranscriptSegments(): Promise<Segment[]> {
   try {
     await openTranscriptPanel();
     await waitForTranscriptPanel();
-    await new Promise((r) => setTimeout(r, 500));
     const cues = parseTranscriptPanel();
-    return new SmartDetectService().detectSegments(cues);
+
+    // Use the new, smarter detector
+    const detector = new SmartDetectService();
+    return detector.detectSegments(cues);
   } catch (err) {
     console.error('[Skip] Transcript heuristics failed:', err);
     return [];

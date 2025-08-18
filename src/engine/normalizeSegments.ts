@@ -19,13 +19,20 @@ export function normalizeSegments(segments: Segment[], padding = 0): Segment[] {
     return [];
   }
 
-  const sorted = [...segments].sort((a, b) => a.start - b.start);
+  // First apply padding to each segment
+  const padded = segments.map((seg) => ({
+    start: Math.max(0, seg.start - padding),
+    end: seg.end + padding,
+  }));
+
+  // Then sort and merge
+  const sorted = [...padded].sort((a, b) => a.start - b.start);
   const result: Segment[] = [];
   let current = { ...sorted[0] };
 
   for (let i = 1; i < sorted.length; i++) {
     const next = sorted[i];
-    if (next.start <= current.end + padding) {
+    if (next.start <= current.end) {
       current.end = Math.max(current.end, next.end);
     } else {
       result.push(current);
