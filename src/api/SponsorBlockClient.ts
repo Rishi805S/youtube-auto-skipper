@@ -12,6 +12,7 @@ export async function fetchSponsorBlockSegments(videoId: string): Promise<Segmen
       .map((seg) => ({
         start: seg.segment[0],
         end: seg.segment[1],
+        category: seg.category,
       }));
   } catch {
     return [];

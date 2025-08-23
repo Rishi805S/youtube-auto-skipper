@@ -4,15 +4,27 @@
   "version": "1.0.0",
   "description": "Auto-skip sponsor segments in YouTube videos",
   "host_permissions": [
-    "*://*.youtube.com/*"
+    "*://*.youtube.com/*",
+    "*://sponsor.ajay.app/*"
   ],
   "permissions": [
     "storage",
     "scripting",
-    "webNavigation"
+    "webNavigation",
+    "activeTab"
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SponsorSkip Control Panel",
+    "default_icon": {
+      "16": "public/icons/icon.png",
+      "32": "public/icons/icon.png",
+      "48": "public/icons/icon.png",
+      "128": "public/icons/icon.png"
+    }
   },
   "content_scripts": [
     {
@@ -23,8 +35,5 @@
         "content.js"
       ]
     }
-  ],
-  "action": {
-    "default_title": "SponsorSkip"
-  }
+  ]
 }

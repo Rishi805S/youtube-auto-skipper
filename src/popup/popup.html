@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SponsorSkip</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body data-theme="dark">
+    <div class="popup-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <div class="logo-icon">💰</div>
+                <h1>SponsorSkip</h1>
+            </div>
+            <div class="theme-controls">
+                <button class="theme-toggle" id="themeToggle">
+                    <span class="theme-icon">🌙</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Status Card -->
+        <div class="status-card">
+            <div class="status-indicator" id="statusIndicator">
+                <div class="status-dot active"></div>
+                <span class="status-text" id="statusText">Active</span>
+            </div>
+            <div class="master-toggle">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="masterToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value" id="totalSkips">0</div>
+                <div class="stat-label">Skipped</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="timeSaved">0m</div>
+                <div class="stat-label">Saved</div>
+            </div>
+        </div>
+
+        <!-- Sponsor Control -->
+        <div class="sponsor-section">
+            <div class="section-title">
+                <span class="sponsor-emoji">💰</span>
+                <span>Sponsor Segments</span>
+            </div>
+            <div class="sponsor-actions">
+                <button class="action-btn skip active" data-action="skip">
+                    <span class="action-icon">⏭️</span>
+                    <span>Skip</span>
+                </button>
+                <button class="action-btn mute" data-action="mute">
+                    <span class="action-icon">🔇</span>
+                    <span>Mute</span>
+                </button>
+                <button class="action-btn ignore" data-action="ignore">
+                    <span class="action-icon">👁️</span>
+                    <span>Watch</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Sync Setting -->
+        <div class="sync-section">
+            <div class="sync-control">
+                <div class="sync-info">
+                    <span class="sync-icon">🔄</span>
+                    <span class="sync-label">Sync Across Devices</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="syncToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <button class="footer-btn" id="resetStats">Reset</button>
+            <div class="version">v1.0</div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

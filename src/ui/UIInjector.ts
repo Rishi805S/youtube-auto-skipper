@@ -73,12 +73,13 @@ export class UIInjector {
     btn.setAttribute('aria-pressed', 'true');
     btn.setAttribute('aria-label', 'Disable SponsorSkip');
 
-    // Insert your SVG icon
+    // Insert SVG icon and text
     btn.innerHTML = `
-    <svg width="24" height="24" viewBox="0 0 24 24">
-      <path fill="currentColor" d="M10 8l6 4-6 4V8z"/>
-    </svg>
-  `;
+      <svg width="24" height="24" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M10 8l6 4-6 4V8z"/>
+      </svg>
+      <span>Auto Skip</span>
+    `;
 
     const toggleState = () => {
       this.enabled = !this.enabled;
@@ -102,17 +103,11 @@ export class UIInjector {
     return btn;
   }
 
-  /** Create the badge counter */
+  /** Create the badge counter (hidden) */
   private createBadge(): HTMLSpanElement {
     const span = document.createElement('span');
     span.id = this.badgeId;
-    span.textContent = String(this.getCount());
-    span.style.background = 'red';
-    span.style.color = 'white';
-    span.style.padding = '2px 6px';
-    span.style.borderRadius = '12px';
-    span.style.fontSize = '12px';
-    span.style.marginLeft = '4px';
+    span.style.display = 'none'; // Hide the badge
     return span;
   }
 
@@ -214,54 +209,44 @@ export class UIInjector {
 
   // src/ui/UIInjector.ts
   private injectStyles() {
-    const css = `
-    /* SponsorSkip Toggle Button */
-    .sponsorskip-toggle-button {
-      background: transparent;
-      border: none;
-      color: #fff;
-      cursor: pointer;
-      opacity: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: opacity 0.2s ease, transform 0.1s ease;
-    }
-    .sponsorskip-toggle-button[aria-pressed="false"] {
-      opacity: 0.4;
-    }
-    .sponsorskip-toggle-button:hover {
-      opacity: 0.8;
-    }
-    .sponsorskip-toggle-button:active {
-      transform: scale(0.92);
-    }
-
-    /* SponsorSkip Badge Counter */
-    .sponsorskip-badge-counter {
-      display: inline-block;
-      background: var(--yt-spec-brand-red);
-      color: #fff;
-      font-size: 12px;
-      font-weight: 500;
-      line-height: 1;
-      padding: 2px 6px;
-      border-radius: 12px;
-      margin-left: 4px;
-      user-select: none;
-      transition: transform 0.2s ease;
-    }
-    .sponsorskip-badge-counter.updated {
-      animation: scale-up 0.2s ease;
-    }
-    @keyframes scale-up {
-      0%   { transform: scale(1); }
-      50%  { transform: scale(1.3); }
-      100% { transform: scale(1); }
-    }
-  `;
-    const style = document.createElement('style');
-    style.textContent = css;
-    document.head.appendChild(style);
+    const styles = document.createElement('style');
+    styles.textContent = `
+      .sponsorskip-toggle-button {
+        padding: 8px 16px;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        cursor: pointer;
+        opacity: 1;
+        transition: all 0.2s;
+        border-radius: 20px;
+        margin: 0 8px;
+        display: flex;
+        align-items: center;
+        font-size: 14px;
+        font-family: "YouTube Sans", "Roboto", sans-serif;
+      }
+      .sponsorskip-toggle-button:hover {
+        background: rgba(0, 0, 0, 0.8);
+        border-color: rgba(255, 255, 255, 0.4);
+      }
+      .sponsorskip-toggle-button svg {
+        margin-right: 6px;
+        width: 16px;
+        height: 16px;
+      }
+      .sponsorskip-toggle-button[aria-pressed="false"] {
+        opacity: 0.7;
+      }
+      .sponsorskip-badge-counter.updated {
+        animation: pulse 0.2s ease-in-out;
+      }
+      @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.2); }
+        100% { transform: scale(1); }
+      }
+    `;
+    document.head.appendChild(styles);
   }
 }
