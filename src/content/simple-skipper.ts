@@ -1,5 +1,7 @@
 // Simple working content script for sponsor skipping
 import { Segment } from '../types/types';
+import { ProgressBarVisualizer } from '../ui/ProgressBarVisualizer';
+import { getSegmentsByPriority } from '../engine/tieredFetcher';
 
 console.log('[SponsorSkip] Simple content script loaded');
 
@@ -14,6 +16,7 @@ let originalVolume = 1; // Track original volume for mute restoration
 let isMuted = false; // Track if currently muted
 let totalSkips = 0; // Track total skips for stats
 let totalTimeSaved = 0; // Track total time saved for stats
+let progressVisualizer: ProgressBarVisualizer | null = null; // Progress bar visualizer
 
 // Get video ID from URL
 function getVideoId(): string | null {
@@ -22,31 +25,58 @@ function getVideoId(): string | null {
   return match ? match[1] : null;
 }
 
-// Fetch segments from SponsorBlock API
+// Fetch segments using three-tiered approach
 async function fetchSegments(videoId: string): Promise<Segment[]> {
   try {
-    console.log('[SponsorSkip] Fetching segments for:', videoId);
-    const response = await fetch(`https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}`);
-
-    if (!response.ok) {
-      console.log('[SponsorSkip] No segments found');
-      return [];
-    }
-
-    const data = await response.json();
-    const segments = data
-      .filter((seg: any) => seg.category === 'sponsor')
-      .map((seg: any) => ({
-        start: seg.segment[0],
-        end: seg.segment[1],
-        category: seg.category || 'sponsor',
-      }));
-
+    console.log('[SponsorSkip] Fetching segments using three-tiered approach for:', videoId);
+    const segments = await getSegmentsByPriority(videoId);
     console.log('[SponsorSkip] Found segments:', segments);
     return segments;
   } catch (error) {
     console.error('[SponsorSkip] Error fetching segments:', error);
     return [];
+  }
+}
+
+// Load segments when video changes
+async function loadSegments() {
+  const videoId = getVideoId();
+  console.log('[SponsorSkip] Current video ID:', videoId);
+  if (videoId && videoId !== currentVideoId) {
+    console.log('[SponsorSkip] New video detected, loading segments...');
+    currentVideoId = videoId;
+    skippedSegments.clear();
+    lastSkipTimes.clear();
+    // Reset stats for new video
+    totalSkips = 0;
+    totalTimeSaved = 0;
+    currentSegments = await fetchSegments(videoId);
+
+    // Initialize progress bar visualizer
+    if (currentSegments.length > 0) {
+      try {
+        progressVisualizer = new ProgressBarVisualizer(currentSegments);
+        await progressVisualizer.init();
+        console.log('[SponsorSkip] Progress bar visualizer initialized');
+      } catch (error) {
+        console.warn('[SponsorSkip] Failed to initialize progress bar visualizer:', error);
+      }
+    }
+
+    // Immediate check after loading segments
+    if (currentSegments.length > 0) {
+      console.log('[SponsorSkip] Segments loaded, doing immediate check');
+      setTimeout(() => {
+        const currentVideo = document.querySelector('video') as HTMLVideoElement;
+        if (currentVideo) {
+          checkForSkip(currentVideo);
+        }
+      }, 100);
+    }
+  } else if (!videoId) {
+    console.log('[SponsorSkip] No video ID found in URL');
+  } else {
+    console.log('[SponsorSkip] Same video, not reloading segments');
   }
 }
 
@@ -57,6 +87,11 @@ function checkForSkip(video: HTMLVideoElement) {
   }
 
   const currentTime = video.currentTime;
+
+  // Update progress bar visualizer
+  if (progressVisualizer) {
+    progressVisualizer.highlightUpcomingSegment(currentTime, 10);
+  }
 
   // Check if we're in an ad (don't skip during ads)
   const player = document.getElementById('movie_player');
@@ -162,62 +197,35 @@ function showNotification(message: string) {
 }
 
 // Initialize when video is found
+let videoObserver: MutationObserver | null = null;
+
 function initialize() {
   console.log('[SponsorSkip] Attempting to find video element...');
   const video = document.querySelector('video');
-  if (!video) {
-    console.log('[SponsorSkip] Video not found, retrying in 1 second');
-    setTimeout(initialize, 1000);
-    return;
-  }
-
-  console.log('[SponsorSkip] Video found, initializing', video);
-
-  // Set up time update listener with throttling to prevent excessive calls
-  let lastCheckTime = 0;
-  video.addEventListener('timeupdate', () => {
-    const now = Date.now();
-    if (now - lastCheckTime > 500) {
-      // Check at most every 500ms
-      lastCheckTime = now;
-      checkForSkip(video);
+  if (video) {
+    console.log('[SponsorSkip] Video found, initializing event listeners');
+    setupVideoEventListeners(video);
+    if (videoObserver) {
+      videoObserver.disconnect();
+      videoObserver = null;
     }
-  });
-
-  // Also check on seeking
-  video.addEventListener('seeked', () => {
-    console.log('[SponsorSkip] Video seeked, checking for segments');
-    checkForSkip(video);
-  });
-
-  // Load segments when video changes
-  async function loadSegments() {
-    const videoId = getVideoId();
-    console.log('[SponsorSkip] Current video ID:', videoId);
-    if (videoId && videoId !== currentVideoId) {
-      console.log('[SponsorSkip] New video detected, loading segments...');
-      currentVideoId = videoId;
-      skippedSegments.clear();
-      lastSkipTimes.clear();
-      // Reset stats for new video
-      totalSkips = 0;
-      totalTimeSaved = 0;
-      currentSegments = await fetchSegments(videoId);
-
-      // Immediate check after loading segments
-      if (currentSegments.length > 0) {
-        console.log('[SponsorSkip] Segments loaded, doing immediate check');
-        setTimeout(() => {
-          const currentVideo = document.querySelector('video') as HTMLVideoElement;
-          if (currentVideo) {
-            checkForSkip(currentVideo);
+  } else {
+    console.log('[SponsorSkip] Video not found, setting up MutationObserver');
+    if (!videoObserver) {
+      videoObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.addedNodes) {
+            for (const node of Array.from(mutation.addedNodes)) {
+              if (node.nodeName === 'VIDEO') {
+                console.log('[SponsorSkip] Video element added to DOM, re-initializing');
+                initialize();
+                return;
+              }
+            }
           }
-        }, 100);
-      }
-    } else if (!videoId) {
-      console.log('[SponsorSkip] No video ID found in URL');
-    } else {
-      console.log('[SponsorSkip] Same video, not reloading segments');
+        }
+      });
+      videoObserver.observe(document.body, { childList: true, subtree: true });
     }
   }
 
@@ -239,6 +247,84 @@ function initialize() {
       }, 1000);
     }
   }).observe(document, { subtree: true, childList: true });
+}
+
+function setupVideoEventListeners(video: HTMLVideoElement) {
+  // Set up time update listener with throttling to prevent excessive calls
+  let lastCheckTime = 0;
+  video.addEventListener('timeupdate', () => {
+    const now = Date.now();
+    if (now - lastCheckTime > 500) {
+      // Check at most every 500ms
+      lastCheckTime = now;
+      checkForSkip(video);
+    }
+  });
+
+  // Also check on seeking
+  video.addEventListener('seeked', () => {
+    console.log('[SponsorSkip] Video seeked, checking for segments');
+    checkForSkip(video);
+  });
+
+  // Enhanced keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // Only handle if not typing in an input field
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+
+    // Alt + S to toggle enabled state
+    if (e.altKey && e.key.toLowerCase() === 's') {
+      isEnabled = !isEnabled;
+      console.log(`[SponsorSkip] ${isEnabled ? 'Enabled' : 'Disabled'} via keyboard shortcut`);
+      showNotification(`🎛️ SponsorSkip ${isEnabled ? 'Enabled' : 'Disabled'}`);
+      return;
+    }
+
+    // Alt + D to show detailed statistics
+    if (e.altKey && e.key.toLowerCase() === 'd') {
+      const minutes = Math.floor(totalTimeSaved / 60);
+      const seconds = Math.round(totalTimeSaved % 60);
+      showNotification(`📊 Stats: ${totalSkips} skips, ${minutes}m ${seconds}s saved`);
+      console.log('[SponsorSkip] Detailed Stats:', {
+        totalSkips,
+        timeSaved: { minutes, seconds },
+      });
+      return;
+    }
+
+    // Alt + M to show memory/learning info
+    if (e.altKey && e.key.toLowerCase() === 'm') {
+      showNotification(
+        `🧠 Segments: ${currentSegments.length} | Skipped: ${skippedSegments.size} | Action: ${sponsorAction}`
+      );
+      console.log('[SponsorSkip] Memory Info:', {
+        segments: currentSegments.length,
+        skipped: skippedSegments.size,
+        action: sponsorAction,
+        enabled: isEnabled,
+      });
+      return;
+    }
+
+    // Alt + P to show performance info
+    if (e.altKey && e.key.toLowerCase() === 'p') {
+      const videoDuration = video.duration || 0;
+      const currentTime = video.currentTime;
+      const progressPercent = videoDuration > 0 ? (currentTime / videoDuration) * 100 : 0;
+      showNotification(
+        `⚡ Progress: ${progressPercent.toFixed(1)}% | Duration: ${Math.round(videoDuration)}s | Segments: ${currentSegments.length}`
+      );
+      console.log('[SponsorSkip] Performance Info:', {
+        progress: progressPercent.toFixed(1) + '%',
+        duration: Math.round(videoDuration),
+        segments: currentSegments.length,
+        currentTime: Math.round(currentTime),
+      });
+      return;
+    }
+  });
 }
 
 // Handle messages from popup
@@ -293,7 +379,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+  console.log('[SponsorSkip] Page unloading, cleaning up');
+  if (progressVisualizer) {
+    progressVisualizer.destroy();
+  }
+});
+
 // Start initialization
 initialize();
+
+// Load segments initially
+console.log('[SponsorSkip] Loading segments for current video...');
+loadSegments();
+
+// Listen for URL changes (YouTube SPA navigation)
+let lastUrl = location.href;
+console.log('[SponsorSkip] Setting up URL change listener for:', lastUrl);
+new MutationObserver(() => {
+  const url = location.href;
+  if (url !== lastUrl) {
+    console.log('[SponsorSkip] URL changed from', lastUrl, 'to', url);
+    lastUrl = url;
+    setTimeout(() => {
+      console.log('[SponsorSkip] Loading segments after URL change...');
+      loadSegments();
+    }, 1000);
+  }
+}).observe(document, { subtree: true, childList: true });
 
 console.log('[SponsorSkip] Simple skipper ready');

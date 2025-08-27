@@ -38,6 +38,18 @@ class PopupController {
     this.startStatsUpdater();
   }
 
+  private async saveAndNotifyState(): Promise<void> {
+    try {
+      await chrome.storage.sync.set({ sponsorSkipSettings: this.state });
+      console.log('[Popup] State saved:', this.state);
+      if (this.state.syncEnabled) {
+        this.notifyContentScript();
+      }
+    } catch (error) {
+      console.error('[Popup] Failed to save state:', error);
+    }
+  }
+
   private async loadState(): Promise<void> {
     try {
       // Load from Chrome storage
@@ -47,7 +59,7 @@ class PopupController {
       } else {
         // Set default state and save it
         console.log('[Popup] No saved settings found, using defaults');
-        await this.saveState();
+        await this.saveAndNotifyState();
       }
 
       // Load stats from local storage
@@ -62,17 +74,6 @@ class PopupController {
       await this.notifyContentScript();
     } catch (error) {
       console.error('[Popup] Failed to load state:', error);
-    }
-  }
-
-  private async saveState(): Promise<void> {
-    try {
-      await chrome.storage.sync.set({ sponsorSkipSettings: this.state });
-      console.log('[Popup] State saved:', this.state);
-      // Notify content script of changes
-      this.notifyContentScript();
-    } catch (error) {
-      console.error('[Popup] Failed to save state:', error);
     }
   }
 
@@ -102,14 +103,14 @@ class PopupController {
       this.state.enabled = (e.target as HTMLInputElement).checked;
       console.log('[Popup] Master toggle changed:', this.state.enabled);
       this.updateStatusIndicator();
-      this.saveState();
+      this.saveAndNotifyState();
     });
 
     // Sync toggle
     const syncToggle = document.getElementById('syncToggle') as HTMLInputElement;
     syncToggle?.addEventListener('change', (e) => {
       this.state.syncEnabled = (e.target as HTMLInputElement).checked;
-      this.saveState();
+      this.saveAndNotifyState();
     });
 
     // Theme toggle
@@ -131,7 +132,7 @@ class PopupController {
           this.state.sponsorAction = action;
           console.log('[Popup] State updated:', this.state);
           this.updateSponsorButtons();
-          this.saveState();
+          this.saveAndNotifyState();
         }
       }
     });
@@ -161,7 +162,7 @@ class PopupController {
   private toggleTheme(): void {
     this.state.theme = this.state.theme === 'dark' ? 'light' : 'dark';
     this.applyTheme();
-    this.saveState();
+    this.saveAndNotifyState();
   }
 
   private applyTheme(): void {
@@ -232,7 +233,7 @@ class PopupController {
           this.stats = { ...this.stats, ...response };
         }
       }
-    } catch (error) {
+    } catch {
       // Tab might not have content script, ignore
     }
   }
