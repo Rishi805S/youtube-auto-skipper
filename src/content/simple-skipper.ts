@@ -2,6 +2,7 @@
 import { Segment } from '../types/types';
 import { ProgressBarVisualizer } from '../ui/ProgressBarVisualizer';
 import { getSegmentsByPriority } from '../engine/tieredFetcher';
+import { startAdDetection, stopAdDetection } from '../features/adSkipper';
 
 console.log('[SponsorSkip] Simple content script loaded');
 
@@ -9,6 +10,7 @@ console.log('[SponsorSkip] Simple content script loaded');
 let currentSegments: Segment[] = [];
 let isEnabled = true;
 let sponsorAction: 'skip' | 'mute' | 'ignore' = 'skip';
+let skipAds = true; // New setting for ad skipping
 const skippedSegments = new Set<number>();
 const lastSkipTimes = new Map<number, number>(); // Track when each segment was last skipped
 let currentVideoId: string | null = null;
@@ -17,12 +19,58 @@ let isMuted = false; // Track if currently muted
 let totalSkips = 0; // Track total skips for stats
 let totalTimeSaved = 0; // Track total time saved for stats
 let progressVisualizer: ProgressBarVisualizer | null = null; // Progress bar visualizer
+let adDetectionInterval: NodeJS.Timeout | null = null; // Ad detection interval
 
 // Get video ID from URL
 function getVideoId(): string | null {
   const url = window.location.href;
   const match = url.match(/[?&]v=([^&]+)/);
   return match ? match[1] : null;
+}
+
+// Load settings from storage and start ad detection
+async function loadSettingsAndStartAdDetection() {
+  try {
+    const result = await chrome.storage.sync.get(['enabled', 'sponsorAction', 'skipAds']);
+    isEnabled = result.enabled !== undefined ? result.enabled : true;
+    sponsorAction = result.sponsorAction || 'skip';
+    skipAds = result.skipAds !== undefined ? result.skipAds : true;
+
+    console.log('[SponsorSkip] Settings loaded from storage:', {
+      isEnabled,
+      sponsorAction,
+      skipAds,
+    });
+
+    // Start ad detection if enabled
+    if (skipAds) {
+      startAdDetectionLoop();
+    }
+  } catch (error) {
+    console.warn('[SponsorSkip] Failed to load settings from storage:', error);
+    // Use defaults and start ad detection
+    if (skipAds) {
+      startAdDetectionLoop();
+    }
+  }
+}
+
+// Start ad detection loop
+function startAdDetectionLoop() {
+  if (adDetectionInterval) {
+    stopAdDetection(adDetectionInterval);
+  }
+  adDetectionInterval = startAdDetection();
+  console.log('[SponsorSkip] Ad detection started');
+}
+
+// Stop ad detection loop
+function stopAdDetectionLoop() {
+  if (adDetectionInterval) {
+    stopAdDetection(adDetectionInterval);
+    adDetectionInterval = null;
+    console.log('[SponsorSkip] Ad detection stopped');
+  }
 }
 
 // Fetch segments using three-tiered approach
@@ -247,6 +295,9 @@ function initialize() {
       }, 1000);
     }
   }).observe(document, { subtree: true, childList: true });
+
+  // Load settings and start ad detection
+  loadSettingsAndStartAdDetection();
 }
 
 function setupVideoEventListeners(video: HTMLVideoElement) {
@@ -279,6 +330,47 @@ function setupVideoEventListeners(video: HTMLVideoElement) {
       isEnabled = !isEnabled;
       console.log(`[SponsorSkip] ${isEnabled ? 'Enabled' : 'Disabled'} via keyboard shortcut`);
       showNotification(`🎛️ SponsorSkip ${isEnabled ? 'Enabled' : 'Disabled'}`);
+      return;
+    }
+
+    // Alt + 1 to set action to SKIP
+    if (e.altKey && e.key === '1') {
+      sponsorAction = 'skip';
+      console.log('[SponsorSkip] Action set to SKIP via keyboard shortcut');
+      showNotification('⏭️ Action: SKIP segments');
+      return;
+    }
+
+    // Alt + 2 to set action to MUTE
+    if (e.altKey && e.key === '2') {
+      sponsorAction = 'mute';
+      console.log('[SponsorSkip] Action set to MUTE via keyboard shortcut');
+      showNotification('🔇 Action: MUTE segments');
+      return;
+    }
+
+    // Alt + 3 to set action to WATCH
+    if (e.altKey && e.key === '3') {
+      sponsorAction = 'ignore';
+      console.log('[SponsorSkip] Action set to WATCH via keyboard shortcut');
+      showNotification('👁️ Action: WATCH segments');
+      return;
+    }
+
+    // Alt + A to toggle ad skipping
+    if (e.altKey && e.key.toLowerCase() === 'a') {
+      skipAds = !skipAds;
+      console.log(
+        `[SponsorSkip] Ad skipping ${skipAds ? 'enabled' : 'disabled'} via keyboard shortcut`
+      );
+      showNotification(`📺 Ad skipping ${skipAds ? 'enabled' : 'disabled'}`);
+
+      // Update ad detection based on new setting
+      if (skipAds) {
+        startAdDetectionLoop();
+      } else {
+        stopAdDetectionLoop();
+      }
       return;
     }
 
@@ -324,6 +416,24 @@ function setupVideoEventListeners(video: HTMLVideoElement) {
       });
       return;
     }
+
+    // Alt + O to open popup (simulate extension icon click)
+    if (e.altKey && e.key.toLowerCase() === 'o') {
+      console.log('[SponsorSkip] Opening popup via keyboard shortcut');
+      showNotification('🔧 Opening popup...');
+      // Try to programmatically open the popup
+      chrome.runtime.sendMessage({ type: 'OPEN_POPUP' });
+      return;
+    }
+
+    // Alt + H to show help/available shortcuts
+    if (e.altKey && e.key.toLowerCase() === 'h') {
+      showNotification(
+        '⌨️ Alt+S:Toggle | Alt+1/2/3:Skip/Mute/Watch | Alt+A:Ads | Alt+O:Popup | Alt+H:Help'
+      );
+      console.log('[SponsorSkip] Help displayed via keyboard shortcut');
+      return;
+    }
   });
 }
 
@@ -337,8 +447,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const previousAction = sponsorAction;
       isEnabled = settings.enabled;
       sponsorAction = settings.sponsorAction || 'skip';
+      skipAds = settings.skipAds !== undefined ? settings.skipAds : true;
       console.log('[SponsorSkip] Settings updated:', settings);
-      console.log('[SponsorSkip] Enabled state:', isEnabled, 'Action:', sponsorAction);
+      console.log(
+        '[SponsorSkip] Enabled state:',
+        isEnabled,
+        'Action:',
+        sponsorAction,
+        'SkipAds:',
+        skipAds
+      );
+
+      // Update ad detection based on new settings
+      if (skipAds) {
+        startAdDetectionLoop();
+      } else {
+        stopAdDetectionLoop();
+      }
 
       // Restore volume when switching away from mute mode
       if (previousAction === 'mute' && sponsorAction !== 'mute' && isMuted) {
@@ -359,7 +484,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
       }
 
-      sendResponse({ success: true, enabled: isEnabled, action: sponsorAction });
+      sendResponse({ success: true, enabled: isEnabled, action: sponsorAction, skipAds: skipAds });
       break;
 
     case 'GET_STATS':
@@ -384,6 +509,9 @@ window.addEventListener('beforeunload', () => {
   console.log('[SponsorSkip] Page unloading, cleaning up');
   if (progressVisualizer) {
     progressVisualizer.destroy();
+  }
+  if (adDetectionInterval) {
+    stopAdDetectionLoop();
   }
 });
 

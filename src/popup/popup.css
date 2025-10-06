@@ -259,6 +259,37 @@ body {
   font-size: 16px;
 }
 
+/* Ad Section */
+.ad-section {
+  margin: 0 16px 16px;
+}
+
+.ad-control {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ad-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ad-icon {
+  font-size: 16px;
+  color: var(--warning);
+}
+
+.ad-label {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
 /* Sync Section */
 .sync-section {
   margin: 0 16px 16px;
@@ -334,6 +365,56 @@ input:checked + .slider {
 
 input:checked + .slider:before {
   transform: translateX(20px);
+}
+
+/* Keyboard Shortcuts Section */
+.shortcuts-section {
+  margin: 0 16px 16px;
+}
+
+.shortcuts-section .section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.shortcuts-emoji {
+  font-size: 16px;
+  color: var(--accent);
+}
+
+.shortcuts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.shortcut-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.shortcut-key {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.shortcut-desc {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-align: center;
 }
 
 /* Footer */

@@ -53,11 +53,15 @@
 
 ### **3. Enhanced Keyboard Shortcuts**
 
-**What to test:** Keyboard shortcuts for quick access to features
+**What to test:** Comprehensive keyboard shortcuts for all features
 
 **How to test:**
 
 - Press `Alt + S` to toggle extension
+- Press `Alt + 1/2/3` to set sponsor action (Skip/Mute/Watch)
+- Press `Alt + A` to toggle ad skipping
+- Press `Alt + O` to open popup
+- Press `Alt + H` to show help
 - Press `Alt + D` for detailed statistics
 - Press `Alt + M` for memory/segment info
 - Press `Alt + P` for performance info
@@ -65,6 +69,12 @@
 **Expected behavior:**
 
 - Alt + S: Toggles extension on/off with notification
+- Alt + 1: Sets action to SKIP segments
+- Alt + 2: Sets action to MUTE segments
+- Alt + 3: Sets action to WATCH segments
+- Alt + A: Toggles YouTube ad skipping on/off
+- Alt + O: Opens extension popup
+- Alt + H: Shows all available shortcuts
 - Alt + D: Shows skip count and time saved
 - Alt + M: Shows segment count and current action
 - Alt + P: Shows video progress and performance info
@@ -121,6 +131,23 @@
 - Colored segments appear on progress bar
 - Hover tooltips show segment details
 - Upcoming segments pulse with animation
+
+### **7. Ad Skipping**
+
+**What to test:** YouTube preroll ad detection and skipping
+
+**How to test:**
+
+- Open YouTube videos with ads
+- Check if ads are automatically skipped
+- Toggle ad skipping on/off in popup
+
+**Expected behavior:**
+
+- Ads are detected when `#movie_player.ad-showing` class is present
+- Ad videos are fast-forwarded to end automatically
+- Console shows: `[AdSkip] Skipping ad: Xs → Ys`
+- Ad skipping can be disabled via popup toggle
 - Works in all YouTube player modes
 
 ---
@@ -146,6 +173,13 @@
 
 - Should return empty segments
 - Console: `[SponsorSkip] No segments found`
+
+### **Videos with Ads**
+
+- Should detect and skip preroll ads
+- Console: `[AdSkip] Skipping ad: Xs → Ys`
+- Ad skipping works regardless of sponsor segment availability
+- Can be toggled on/off via popup
 
 ---
 
@@ -178,6 +212,13 @@
 2. Check if extension is enabled
 3. Try different browsers
 4. Verify Alt key combinations
+
+### **Ad Skipping Not Working**
+
+1. Check if ad skipping is enabled in popup
+2. Look for `[AdSkip]` console messages
+3. Verify `#movie_player.ad-showing` class is present
+4. Check if ads are actually playing (not just thumbnails)
 
 ---
 
@@ -212,6 +253,7 @@
 - [ ] Keyboard shortcuts respond properly
 - [ ] Skip/Mute/Watch modes function correctly
 - [ ] Notifications appear and disappear smoothly
+- [ ] Ad skipping detects and skips YouTube preroll ads
 
 ### **Performance Requirements**
 
@@ -231,4 +273,4 @@
 
 **Testing Status**: ✅ **READY FOR TESTING**
 
-All features implemented and ready for comprehensive testing. Three-tiered detection system, visual progress bar, and enhanced keyboard shortcuts are all functional.
+All features implemented and ready for comprehensive testing. Three-tiered detection system, visual progress bar, comprehensive keyboard shortcuts (10 shortcuts), and ad skipping with skip button detection are all functional.

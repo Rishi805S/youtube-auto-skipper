@@ -25,7 +25,8 @@
 - [x] **Stats Tracking**: Accurate skip count and time saved display
 - [x] **Settings Sync**: Popup changes apply immediately to content script
 - [x] **Visual Progress Bar**: Colored segments on YouTube progress bar
-- [x] **Enhanced Keyboard Shortcuts**: Alt+S, Alt+D, Alt+M, Alt+P
+- [x] **Enhanced Keyboard Shortcuts**: Alt+S (Toggle), Alt+1/2/3 (Skip/Mute/Watch), Alt+A (Ads), Alt+O (Popup), Alt+H (Help), Alt+D (Stats), Alt+M (Memory), Alt+P (Performance)
+- [x] **Ad Skipping**: YouTube preroll ad detection and automatic skipping
 
 ### Browser Compatibility
 

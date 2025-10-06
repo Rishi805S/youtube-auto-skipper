@@ -18,3 +18,14 @@ chrome.webNavigation.onHistoryStateUpdated.addListener(
     url: [{ hostContains: 'youtube.com/*' }],
   }
 );
+
+// Handle popup opening request from content script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'OPEN_POPUP') {
+    console.log('[BG] Received request to open popup');
+    // Open the popup by clicking the extension icon
+    chrome.action.openPopup();
+    sendResponse({ success: true });
+  }
+  return true;
+});

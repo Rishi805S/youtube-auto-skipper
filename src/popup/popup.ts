@@ -4,6 +4,7 @@ interface PopupState {
   enabled: boolean;
   syncEnabled: boolean;
   sponsorAction: 'skip' | 'mute' | 'ignore';
+  skipAds: boolean;
   theme: 'dark' | 'light';
 }
 
@@ -17,6 +18,7 @@ class PopupController {
     enabled: true,
     syncEnabled: true,
     sponsorAction: 'skip',
+    skipAds: true,
     theme: 'dark',
   };
 
@@ -56,6 +58,10 @@ class PopupController {
       const result = await chrome.storage.sync.get(['sponsorSkipSettings']);
       if (result.sponsorSkipSettings) {
         this.state = { ...this.state, ...result.sponsorSkipSettings };
+        // Ensure skipAds has a default value if not present in old settings
+        if (this.state.skipAds === undefined) {
+          this.state.skipAds = true;
+        }
       } else {
         // Set default state and save it
         console.log('[Popup] No saved settings found, using defaults');
@@ -113,6 +119,14 @@ class PopupController {
       this.saveAndNotifyState();
     });
 
+    // Ad toggle
+    const adToggle = document.getElementById('adToggle') as HTMLInputElement;
+    adToggle?.addEventListener('change', (e) => {
+      this.state.skipAds = (e.target as HTMLInputElement).checked;
+      console.log('[Popup] Ad toggle changed:', this.state.skipAds);
+      this.saveAndNotifyState();
+    });
+
     // Theme toggle
     const themeToggle = document.getElementById('themeToggle') as HTMLButtonElement;
     themeToggle?.addEventListener('click', () => {
@@ -147,6 +161,7 @@ class PopupController {
     // Update toggles
     (document.getElementById('masterToggle') as HTMLInputElement).checked = this.state.enabled;
     (document.getElementById('syncToggle') as HTMLInputElement).checked = this.state.syncEnabled;
+    (document.getElementById('adToggle') as HTMLInputElement).checked = this.state.skipAds;
 
     // Update theme
     this.applyTheme();
