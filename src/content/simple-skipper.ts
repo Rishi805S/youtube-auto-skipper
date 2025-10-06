@@ -141,9 +141,29 @@ function checkForSkip(video: HTMLVideoElement) {
     progressVisualizer.highlightUpcomingSegment(currentTime, 10);
   }
 
-  // Check if we're in an ad (don't skip during ads)
+  // Check if we're in an ad (skip only up to last 5 seconds)
   const player = document.getElementById('movie_player');
   if (player && player.classList.contains('ad-showing')) {
+    // Try to get ad duration
+    const adVideo = document.querySelector('video');
+    if (adVideo && adVideo.duration > 7) {
+      // If more than 7 seconds, skip to last 5 seconds
+      if (adVideo.currentTime < adVideo.duration - 5) {
+        adVideo.currentTime = adVideo.duration - 5;
+        showNotification('Skipped to last 5 seconds of ad for inspection');
+      }
+      // Try to click the skip button
+      const skipBtn =
+        (document.querySelector(
+          '.ytp-skip-ad-button.ytp-ad-component--clickable'
+        ) as HTMLButtonElement | null) ||
+        (document.getElementById('skip-button:1j') as HTMLButtonElement | null);
+      if (skipBtn) {
+        skipBtn.click();
+        showNotification('Clicked YouTube Skip Ad button');
+        console.log('[SponsorSkip] Clicked YouTube Skip Ad button');
+      }
+    }
     return;
   }
 
