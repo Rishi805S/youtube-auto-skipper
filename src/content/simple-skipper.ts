@@ -557,4 +557,66 @@ new MutationObserver(() => {
   }
 }).observe(document, { subtree: true, childList: true });
 
+// --- Instant Skip Ad Button Observer ---
+
+function setupInstantSkipAdObserver() {
+  const skipButtonSelectors = [
+    '.ytp-skip-ad-button',
+    '.ytp-skip-ad-button__text',
+    '.ytp-ad-skip-button',
+    '.ytp-ad-skip-button-modest',
+    '.ytp-ad-skip-button-container button',
+    'button[aria-label*="Skip"]',
+    'button[aria-label*="skip"]',
+    '.ytp-ad-skip-button-slot button',
+    '[data-tooltip-target-id="ytp-ad-skip-button"]',
+    'button[id*="skip-button"]',
+  ];
+
+  function simulateUserClick(btn: HTMLElement) {
+    // Simulate a real user click for best compatibility
+    btn.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    btn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  }
+
+  function trySkipAdButtonAndAdvanceVideo() {
+    const player = document.getElementById('movie_player');
+    if (!player || !player.classList.contains('ad-showing')) {
+      return; // Only act if ad is showing
+    }
+    for (const selector of skipButtonSelectors) {
+      const btn = document.querySelector(selector) as HTMLElement;
+      if (btn && btn.offsetParent !== null) {
+        if (btn instanceof HTMLButtonElement && btn.disabled) continue;
+        simulateUserClick(btn);
+        console.log('[SponsorSkip] Instantly simulated user click on Skip Ad button');
+        // Only advance ad video if player is in ad-showing mode
+        const adVideo = player.querySelector('video');
+        if (adVideo && adVideo.duration > 0 && adVideo.currentTime < adVideo.duration - 0.5) {
+          adVideo.currentTime = adVideo.duration;
+          console.log('[SponsorSkip] Advanced ad video to end (ad-showing)');
+        }
+        break;
+      }
+    }
+  }
+
+  // Fastest polling: requestAnimationFrame loop
+  function rafLoop() {
+    trySkipAdButtonAndAdvanceVideo();
+    window.requestAnimationFrame(rafLoop);
+  }
+  window.requestAnimationFrame(rafLoop);
+
+  // Also keep the MutationObserver as a backup
+  const observer = new MutationObserver(() => {
+    trySkipAdButtonAndAdvanceVideo();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+setupInstantSkipAdObserver();
+
 console.log('[SponsorSkip] Simple skipper ready');
