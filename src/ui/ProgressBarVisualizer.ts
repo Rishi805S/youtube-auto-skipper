@@ -16,17 +16,17 @@ export class ProgressBarVisualizer {
   private observer?: MutationObserver;
   private videoDuration = 0;
 
-  // Category color mapping
+  // Category color mapping (all green for visual appeal)
   private categoryColors = {
-    sponsor: '#ff4444',
-    selfpromo: '#ff9500',
-    interaction: '#cc00ff',
-    intro: '#00ffff',
-    outro: '#008080',
-    preview: '#ffff00',
-    music_offtopic: '#ff69b4',
-    filler: '#7fff00',
-    default: '#ffffff',
+    sponsor: '#00ff00', // green
+    selfpromo: '#ffffffff',
+    interaction: '#ffffffff',
+    intro: '#ffffffff',
+    outro: '#ffffffff',
+    preview: '#ffffffff',
+    music_offtopic: '#ffffffff',
+    filler: '#ffffffff',
+    default: '#ffffffff',
   };
 
   constructor(private segments: Segment[]) {

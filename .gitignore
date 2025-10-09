@@ -1,2 +1,17 @@
 /node_modules
 /dist
+/coverage
+/test-results
+/playwright-report
+/playwright-artifacts*
+*.log
+.DS_Store
+.vscode
+.idea
+*.tgz
+*.zip
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.map
+Thumbs.db
