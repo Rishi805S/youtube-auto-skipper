@@ -10,7 +10,20 @@ export default [
       format: 'iife',
       sourcemap: process.env.NODE_ENV !== 'production',
     },
-    plugins: [typescript({ tsconfig: './tsconfig.json' })],
+    plugins: [
+      typescript({ tsconfig: './tsconfig.json' }),
+      copy({
+        targets: [
+          { src: 'manifest.json', dest: 'dist/' },
+          { src: 'public', dest: 'dist/' },
+          { src: 'src/popup/popup.html', dest: 'dist/' },
+          { src: 'src/popup/popup.css', dest: 'dist/' },
+        ],
+        copyOnce: true,
+        hook: 'writeBundle',
+        verbose: true,
+      }),
+    ],
   },
   // Build the content script
   {
@@ -31,29 +44,5 @@ export default [
       sourcemap: process.env.NODE_ENV !== 'production',
     },
     plugins: [typescript({ tsconfig: './tsconfig.json' })],
-  },
-  // This part handles copying static files
-  {
-    input: 'empty.js', // Uses an empty file in the root to trigger the copy plugin
-    plugins: [
-      copy({
-        targets: [
-          // This line tells Rollup to copy manifest.json to the dist folder
-          { src: 'manifest.json', dest: 'dist/' },
-          // This line copies your icons
-          { src: 'public', dest: 'dist/' },
-          // Copy popup HTML and CSS
-          { src: 'src/popup/popup.html', dest: 'dist/' },
-          { src: 'src/popup/popup.css', dest: 'dist/' },
-        ],
-        copyOnce: true,
-        hook: 'writeBundle',
-        verbose: true,
-      }),
-    ],
-    // Rollup requires an output, even for a dummy entry
-    output: {
-      file: 'dist/dummy.js',
-    },
   },
 ];

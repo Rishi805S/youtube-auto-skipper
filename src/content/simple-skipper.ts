@@ -1,169 +1,119 @@
-// Simple working content script for sponsor skipping
 import { Segment } from '../types/types';
 import { ProgressBarVisualizer } from '../ui/ProgressBarVisualizer';
 import { getSegmentsByPriority } from '../engine/tieredFetcher';
 import { startAdDetection, stopAdDetection } from '../features/adSkipper';
+import { CONFIG } from '../config/constants';
+import { Logger } from '../utils/Logger';
+import { NotificationManager } from '../ui/NotificationManager';
+import { InputHandler, SkipperState } from '../features/InputHandler';
+import { VideoManager } from '../utils/VideoManager';
+import { debounce } from '../utils/domHelpers';
 
-console.log('[SponsorSkip] Simple content script loaded');
+Logger.log('Simple content script loaded');
 
-// Current state
-let currentSegments: Segment[] = [];
-let isEnabled = true;
-let sponsorAction: 'skip' | 'mute' | 'ignore' = 'skip';
-let skipAds = true; // New setting for ad skipping
+// Get VideoManager singleton
+const videoManager = VideoManager.getInstance();
+
+// State
+const state: SkipperState = {
+  isEnabled: CONFIG.DEFAULTS.ENABLED,
+  sponsorAction: CONFIG.DEFAULTS.ACTION,
+  skipAds: CONFIG.DEFAULTS.SKIP_ADS,
+};
+
 const skippedSegments = new Set<number>();
-const lastSkipTimes = new Map<number, number>(); // Track when each segment was last skipped
+const lastSkipTimes = new Map<number, number>();
+let currentSegments: Segment[] = [];
 let currentVideoId: string | null = null;
-let originalVolume = 1; // Track original volume for mute restoration
-let isMuted = false; // Track if currently muted
-let totalSkips = 0; // Track total skips for stats
-let totalTimeSaved = 0; // Track total time saved for stats
-let progressVisualizer: ProgressBarVisualizer | null = null; // Progress bar visualizer
-let adDetectionInterval: NodeJS.Timeout | null = null; // Ad detection interval
+let originalVolume = 1;
+let isMuted = false;
+let totalSkips = 0;
+let totalTimeSaved = 0;
+let progressVisualizer: ProgressBarVisualizer | null = null;
+let adDetectionInterval: NodeJS.Timeout | null = null;
 
-// Get video ID from URL
+// --- Helpers ---
+
 function getVideoId(): string | null {
-  const url = window.location.href;
-  const match = url.match(/[?&]v=([^&]+)/);
+  const match = window.location.href.match(/[?&]v=([^&]+)/);
   return match ? match[1] : null;
 }
 
-// Load settings from storage and start ad detection
-async function loadSettingsAndStartAdDetection() {
-  try {
-    const result = await chrome.storage.sync.get(['enabled', 'sponsorAction', 'skipAds']);
-    isEnabled = result.enabled !== undefined ? result.enabled : true;
-    sponsorAction = result.sponsorAction || 'skip';
-    skipAds = result.skipAds !== undefined ? result.skipAds : true;
+function updateState(newState: Partial<SkipperState>) {
+  Object.assign(state, newState);
+  Logger.log('State updated:', state);
 
-    console.log('[SponsorSkip] Settings loaded from storage:', {
-      isEnabled,
-      sponsorAction,
-      skipAds,
-    });
+  if (newState.skipAds !== undefined) {
+    if (state.skipAds) startAdDetectionLoop();
+    else stopAdDetectionLoop();
+  }
 
-    // Start ad detection if enabled
-    if (skipAds) {
-      startAdDetectionLoop();
-    }
-  } catch (error) {
-    console.warn('[SponsorSkip] Failed to load settings from storage:', error);
-    // Use defaults and start ad detection
-    if (skipAds) {
-      startAdDetectionLoop();
-    }
+  // Handle mute restoration if switching away from mute action
+  if (newState.sponsorAction && newState.sponsorAction !== 'mute' && isMuted) {
+    videoManager.setVolume(originalVolume);
+    isMuted = false;
+    Logger.log('Volume restored (action changed)');
   }
 }
 
-// Start ad detection loop
 function startAdDetectionLoop() {
-  if (adDetectionInterval) {
-    stopAdDetection(adDetectionInterval);
-  }
+  if (adDetectionInterval) stopAdDetection(adDetectionInterval);
   adDetectionInterval = startAdDetection();
-  console.log('[SponsorSkip] Ad detection started');
+  Logger.log('Ad detection started');
 }
 
-// Stop ad detection loop
 function stopAdDetectionLoop() {
   if (adDetectionInterval) {
     stopAdDetection(adDetectionInterval);
     adDetectionInterval = null;
-    console.log('[SponsorSkip] Ad detection stopped');
+    Logger.log('Ad detection stopped');
   }
 }
 
-// Fetch segments using three-tiered approach
-async function fetchSegments(videoId: string): Promise<Segment[]> {
-  try {
-    console.log('[SponsorSkip] Fetching segments using three-tiered approach for:', videoId);
-    const segments = await getSegmentsByPriority(videoId);
-    console.log('[SponsorSkip] Found segments:', segments);
-    return segments;
-  } catch (error) {
-    console.error('[SponsorSkip] Error fetching segments:', error);
-    return [];
-  }
-}
+// --- Core Logic ---
 
-// Load segments when video changes
 async function loadSegments() {
   const videoId = getVideoId();
-  console.log('[SponsorSkip] Current video ID:', videoId);
+  Logger.log('Current video ID:', videoId);
+
   if (videoId && videoId !== currentVideoId) {
-    console.log('[SponsorSkip] New video detected, loading segments...');
+    Logger.log('New video detected, loading segments...');
     currentVideoId = videoId;
     skippedSegments.clear();
     lastSkipTimes.clear();
-    // Reset stats for new video
     totalSkips = 0;
     totalTimeSaved = 0;
-    currentSegments = await fetchSegments(videoId);
 
-    // Initialize progress bar visualizer
+    currentSegments = await getSegmentsByPriority(videoId);
+    Logger.log('Segments loaded:', currentSegments);
+
     if (currentSegments.length > 0) {
       try {
         progressVisualizer = new ProgressBarVisualizer(currentSegments);
         await progressVisualizer.init();
-        console.log('[SponsorSkip] Progress bar visualizer initialized');
+        Logger.log('Visualizer initialized');
       } catch (error) {
-        console.warn('[SponsorSkip] Failed to initialize progress bar visualizer:', error);
+        Logger.warn('Visualizer init failed:', error);
       }
-    }
 
-    // Immediate check after loading segments
-    if (currentSegments.length > 0) {
-      console.log('[SponsorSkip] Segments loaded, doing immediate check');
+      // Immediate check
       setTimeout(() => {
-        const currentVideo = document.querySelector('video') as HTMLVideoElement;
-        if (currentVideo) {
-          checkForSkip(currentVideo);
-        }
+        const video = videoManager.getVideo();
+        if (video) checkForSkip(video);
       }, 100);
     }
-  } else if (!videoId) {
-    console.log('[SponsorSkip] No video ID found in URL');
-  } else {
-    console.log('[SponsorSkip] Same video, not reloading segments');
   }
 }
 
-// Check if current time is in a sponsor segment
 function checkForSkip(video: HTMLVideoElement) {
-  if (!isEnabled || !currentSegments.length || sponsorAction === 'ignore') {
-    return;
-  }
+  if (!state.isEnabled || !currentSegments.length || state.sponsorAction === 'ignore') return;
 
   const currentTime = video.currentTime;
+  if (progressVisualizer) progressVisualizer.highlightUpcomingSegment(currentTime, 10);
 
-  // Update progress bar visualizer
-  if (progressVisualizer) {
-    progressVisualizer.highlightUpcomingSegment(currentTime, 10);
-  }
-
-  // Check if we're in an ad (skip only up to last 5 seconds)
-  const player = document.getElementById('movie_player');
+  // Check for ads (legacy check, mostly handled by adSkipper now)
+  const player = document.querySelector(CONFIG.SELECTORS.PLAYER);
   if (player && player.classList.contains('ad-showing')) {
-    // Try to get ad duration
-    const adVideo = document.querySelector('video');
-    if (adVideo && adVideo.duration > 7) {
-      // If more than 7 seconds, skip to last 5 seconds
-      if (adVideo.currentTime < adVideo.duration - 5) {
-        adVideo.currentTime = adVideo.duration - 5;
-        showNotification('Skipped to last 5 seconds of ad for inspection');
-      }
-      // Try to click the skip button
-      const skipBtn =
-        (document.querySelector(
-          '.ytp-skip-ad-button.ytp-ad-component--clickable'
-        ) as HTMLButtonElement | null) ||
-        (document.getElementById('skip-button:1j') as HTMLButtonElement | null);
-      if (skipBtn) {
-        skipBtn.click();
-        showNotification('Clicked YouTube Skip Ad button');
-        console.log('[SponsorSkip] Clicked YouTube Skip Ad button');
-      }
-    }
     return;
   }
 
@@ -171,452 +121,163 @@ function checkForSkip(video: HTMLVideoElement) {
     const segment = currentSegments[i];
 
     if (currentTime >= segment.start && currentTime < segment.end) {
-      // Allow re-skipping if enough time has passed (3 seconds cooldown)
       const lastSkipTime = lastSkipTimes.get(i) || 0;
       const now = Date.now();
-      const canSkip = !skippedSegments.has(i) || now - lastSkipTime > 3000;
+      const canSkip = !skippedSegments.has(i) || now - lastSkipTime > CONFIG.TIMEOUTS.SKIP_COOLDOWN;
 
       if (canSkip) {
-        console.log('[SponsorSkip] Segment detected:', segment, 'Action:', sponsorAction);
-
-        try {
-          const segmentDuration = segment.end - segment.start;
-
-          if (sponsorAction === 'skip') {
-            // Restore volume if it was muted before
-            if (isMuted) {
-              video.volume = originalVolume;
-              isMuted = false;
-              console.log('[SponsorSkip] Volume restored when switching to skip mode');
-            }
-
-            video.currentTime = segment.end;
-            skippedSegments.add(i);
-            lastSkipTimes.set(i, now);
-            totalSkips++;
-            totalTimeSaved += segmentDuration;
-            showNotification(`Skipped sponsor segment (${Math.round(segmentDuration)}s)`);
-            console.log(
-              `[SponsorSkip] Successfully skipped from ${segment.start}s to ${segment.end}s`
-            );
-          } else if (sponsorAction === 'mute') {
-            // Store original volume if not already muted
-            if (!isMuted) {
-              originalVolume = video.volume;
-            }
-            video.volume = 0;
-            isMuted = true;
-            skippedSegments.add(i);
-            lastSkipTimes.set(i, now);
-            totalSkips++;
-            totalTimeSaved += segmentDuration;
-            showNotification(`Muted sponsor segment (${Math.round(segmentDuration)}s)`);
-            console.log(`[SponsorSkip] Muted segment from ${segment.start}s to ${segment.end}s`);
-
-            // Restore volume when segment ends
-            const checkUnmute = () => {
-              if (video.currentTime >= segment.end) {
-                video.volume = originalVolume;
-                isMuted = false;
-                video.removeEventListener('timeupdate', checkUnmute);
-                console.log('[SponsorSkip] Volume restored after mute segment');
-              }
-            };
-            video.addEventListener('timeupdate', checkUnmute);
-          }
-        } catch (error) {
-          console.error('[SponsorSkip] Error during action:', error);
-        }
+        executeSkipAction(video, segment, i);
         break;
       }
     } else {
-      // Clear skipped status when user is outside the segment
+      // Reset skip status if outside segment
       if (skippedSegments.has(i) && (currentTime < segment.start || currentTime >= segment.end)) {
         skippedSegments.delete(i);
-        console.log(`[SponsorSkip] Cleared skip status for segment ${i} (user outside segment)`);
       }
     }
   }
 }
 
-// Simple notification
-function showNotification(message: string) {
-  console.log('[SponsorSkip] ' + message);
+function executeSkipAction(video: HTMLVideoElement, segment: Segment, index: number) {
+  const duration = segment.end - segment.start;
+  const now = Date.now();
 
-  // Create simple toast notification
-  const toast = document.createElement('div');
-  toast.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: #333;
-    color: white;
-    padding: 10px 15px;
-    border-radius: 5px;
-    z-index: 10000;
-    font-size: 14px;
-  `;
-  toast.textContent = message;
-  document.body.appendChild(toast);
+  try {
+    if (state.sponsorAction === 'skip') {
+      if (isMuted) {
+        videoManager.setVolume(originalVolume);
+        isMuted = false;
+      }
+      videoManager.setCurrentTime(segment.end);
+      NotificationManager.show(`Skipped sponsor (${Math.round(duration)}s)`);
+      Logger.log(`Skipped ${segment.start} -> ${segment.end}`);
+    } else if (state.sponsorAction === 'mute') {
+      if (!isMuted) originalVolume = videoManager.getVolume();
+      videoManager.setVolume(0);
+      isMuted = true;
+      NotificationManager.show(`Muted sponsor (${Math.round(duration)}s)`);
+      Logger.log(`Muted ${segment.start} -> ${segment.end}`);
 
-  setTimeout(() => {
-    document.body.removeChild(toast);
-  }, 3000);
+      const checkUnmute = () => {
+        if (videoManager.getCurrentTime() >= segment.end) {
+          videoManager.setVolume(originalVolume);
+          isMuted = false;
+          videoManager.removeEventListener('timeupdate', checkUnmute);
+          Logger.log('Unmuted');
+        }
+      };
+      videoManager.addEventListener('timeupdate', checkUnmute);
+    }
+
+    skippedSegments.add(index);
+    lastSkipTimes.set(index, now);
+    totalSkips++;
+    totalTimeSaved += duration;
+  } catch (error) {
+    Logger.error('Error executing skip action:', error);
+  }
 }
 
-// Initialize when video is found
-let videoObserver: MutationObserver | null = null;
+// --- Initialization ---
 
 function initialize() {
-  console.log('[SponsorSkip] Attempting to find video element...');
-  const video = document.querySelector('video');
-  if (video) {
-    console.log('[SponsorSkip] Video found, initializing event listeners');
-    setupVideoEventListeners(video);
-    if (videoObserver) {
-      videoObserver.disconnect();
-      videoObserver = null;
-    }
-  } else {
-    console.log('[SponsorSkip] Video not found, setting up MutationObserver');
-    if (!videoObserver) {
-      videoObserver = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          if (mutation.addedNodes) {
-            for (const node of Array.from(mutation.addedNodes)) {
-              if (node.nodeName === 'VIDEO') {
-                console.log('[SponsorSkip] Video element added to DOM, re-initializing');
-                initialize();
-                return;
-              }
-            }
-          }
+  Logger.log('Initializing...');
+  
+  // Load settings
+  chrome.storage.sync.get(['enabled', 'sponsorAction', 'skipAds'], (result) => {
+    updateState({
+      isEnabled: result.enabled ?? CONFIG.DEFAULTS.ENABLED,
+      sponsorAction: result.sponsorAction ?? CONFIG.DEFAULTS.ACTION,
+      skipAds: result.skipAds ?? CONFIG.DEFAULTS.SKIP_ADS,
+    });
+  });
+
+  // Input Handler
+  const inputHandler = new InputHandler(
+    () => state,
+    updateState,
+    () => {
+      const mins = Math.floor(totalTimeSaved / 60);
+      const secs = Math.round(totalTimeSaved % 60);
+      NotificationManager.show(`📊 Stats: ${totalSkips} skips, ${mins}m ${secs}s saved`);
+    },
+    () => {
+      NotificationManager.show(`🧠 Segments: ${currentSegments.length} | Skipped: ${skippedSegments.size}`);
+    },
+    () => {
+      const video = videoManager.getVideo();
+      if (video) {
+        const pct = ((video.currentTime / video.duration) * 100).toFixed(1);
+        NotificationManager.show(`⚡ Progress: ${pct}%`);
+      }
+    },
+    () => chrome.runtime.sendMessage({ type: 'OPEN_POPUP' })
+  );
+  inputHandler.init();
+
+  // Video Observer
+  const observer = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      for (const node of Array.from(m.addedNodes)) {
+        if (node.nodeName === 'VIDEO') {
+          Logger.log('Video element added');
+          setupVideoListeners(node as HTMLVideoElement);
+          loadSegments();
+          return;
         }
-      });
-      videoObserver.observe(document.body, { childList: true, subtree: true });
+      }
     }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  // Initial check
+  const video = videoManager.getVideo();
+  if (video) {
+    setupVideoListeners(video);
+    loadSegments();
   }
 
-  // Load segments initially
-  console.log('[SponsorSkip] Loading segments for current video...');
-  loadSegments();
-
-  // Listen for URL changes (YouTube SPA navigation)
+  // URL Observer with debounce
   let lastUrl = location.href;
-  console.log('[SponsorSkip] Setting up URL change listener for:', lastUrl);
+  const debouncedLoadSegments = debounce(loadSegments, CONFIG.TIMEOUTS.URL_CHANGE_DELAY);
+  
   new MutationObserver(() => {
-    const url = location.href;
-    if (url !== lastUrl) {
-      console.log('[SponsorSkip] URL changed from', lastUrl, 'to', url);
-      lastUrl = url;
-      setTimeout(() => {
-        console.log('[SponsorSkip] Loading segments after URL change...');
-        loadSegments();
-      }, 1000);
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      Logger.log('URL changed');
+      debouncedLoadSegments();
     }
   }).observe(document, { subtree: true, childList: true });
-
-  // Load settings and start ad detection
-  loadSettingsAndStartAdDetection();
 }
 
-function setupVideoEventListeners(video: HTMLVideoElement) {
-  // Set up time update listener with throttling to prevent excessive calls
-  let lastCheckTime = 0;
-  video.addEventListener('timeupdate', () => {
+function setupVideoListeners(video: HTMLVideoElement) {
+  let lastCheck = 0;
+  videoManager.addEventListener('timeupdate', () => {
     const now = Date.now();
-    if (now - lastCheckTime > 500) {
-      // Check at most every 500ms
-      lastCheckTime = now;
+    if (now - lastCheck > CONFIG.TIMEOUTS.VIDEO_CHECK_THROTTLE) {
+      lastCheck = now;
       checkForSkip(video);
     }
   });
-
-  // Also check on seeking
-  video.addEventListener('seeked', () => {
-    console.log('[SponsorSkip] Video seeked, checking for segments');
-    checkForSkip(video);
-  });
-
-  // Enhanced keyboard shortcuts
-  document.addEventListener('keydown', (e) => {
-    // Only handle if not typing in an input field
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-      return;
-    }
-
-    // Alt + S to toggle enabled state
-    if (e.altKey && e.key.toLowerCase() === 's') {
-      isEnabled = !isEnabled;
-      console.log(`[SponsorSkip] ${isEnabled ? 'Enabled' : 'Disabled'} via keyboard shortcut`);
-      showNotification(`🎛️ SponsorSkip ${isEnabled ? 'Enabled' : 'Disabled'}`);
-      return;
-    }
-
-    // Alt + 1 to set action to SKIP
-    if (e.altKey && e.key === '1') {
-      sponsorAction = 'skip';
-      console.log('[SponsorSkip] Action set to SKIP via keyboard shortcut');
-      showNotification('⏭️ Action: SKIP segments');
-      return;
-    }
-
-    // Alt + 2 to set action to MUTE
-    if (e.altKey && e.key === '2') {
-      sponsorAction = 'mute';
-      console.log('[SponsorSkip] Action set to MUTE via keyboard shortcut');
-      showNotification('🔇 Action: MUTE segments');
-      return;
-    }
-
-    // Alt + 3 to set action to WATCH
-    if (e.altKey && e.key === '3') {
-      sponsorAction = 'ignore';
-      console.log('[SponsorSkip] Action set to WATCH via keyboard shortcut');
-      showNotification('👁️ Action: WATCH segments');
-      return;
-    }
-
-    // Alt + A to toggle ad skipping
-    if (e.altKey && e.key.toLowerCase() === 'a') {
-      skipAds = !skipAds;
-      console.log(
-        `[SponsorSkip] Ad skipping ${skipAds ? 'enabled' : 'disabled'} via keyboard shortcut`
-      );
-      showNotification(`📺 Ad skipping ${skipAds ? 'enabled' : 'disabled'}`);
-
-      // Update ad detection based on new setting
-      if (skipAds) {
-        startAdDetectionLoop();
-      } else {
-        stopAdDetectionLoop();
-      }
-      return;
-    }
-
-    // Alt + D to show detailed statistics
-    if (e.altKey && e.key.toLowerCase() === 'd') {
-      const minutes = Math.floor(totalTimeSaved / 60);
-      const seconds = Math.round(totalTimeSaved % 60);
-      showNotification(`📊 Stats: ${totalSkips} skips, ${minutes}m ${seconds}s saved`);
-      console.log('[SponsorSkip] Detailed Stats:', {
-        totalSkips,
-        timeSaved: { minutes, seconds },
-      });
-      return;
-    }
-
-    // Alt + M to show memory/learning info
-    if (e.altKey && e.key.toLowerCase() === 'm') {
-      showNotification(
-        `🧠 Segments: ${currentSegments.length} | Skipped: ${skippedSegments.size} | Action: ${sponsorAction}`
-      );
-      console.log('[SponsorSkip] Memory Info:', {
-        segments: currentSegments.length,
-        skipped: skippedSegments.size,
-        action: sponsorAction,
-        enabled: isEnabled,
-      });
-      return;
-    }
-
-    // Alt + P to show performance info
-    if (e.altKey && e.key.toLowerCase() === 'p') {
-      const videoDuration = video.duration || 0;
-      const currentTime = video.currentTime;
-      const progressPercent = videoDuration > 0 ? (currentTime / videoDuration) * 100 : 0;
-      showNotification(
-        `⚡ Progress: ${progressPercent.toFixed(1)}% | Duration: ${Math.round(videoDuration)}s | Segments: ${currentSegments.length}`
-      );
-      console.log('[SponsorSkip] Performance Info:', {
-        progress: progressPercent.toFixed(1) + '%',
-        duration: Math.round(videoDuration),
-        segments: currentSegments.length,
-        currentTime: Math.round(currentTime),
-      });
-      return;
-    }
-
-    // Alt + O to open popup (simulate extension icon click)
-    if (e.altKey && e.key.toLowerCase() === 'o') {
-      console.log('[SponsorSkip] Opening popup via keyboard shortcut');
-      showNotification('🔧 Opening popup...');
-      // Try to programmatically open the popup
-      chrome.runtime.sendMessage({ type: 'OPEN_POPUP' });
-      return;
-    }
-
-    // Alt + H to show help/available shortcuts
-    if (e.altKey && e.key.toLowerCase() === 'h') {
-      showNotification(
-        '⌨️ Alt+S:Toggle | Alt+1/2/3:Skip/Mute/Watch | Alt+A:Ads | Alt+O:Popup | Alt+H:Help'
-      );
-      console.log('[SponsorSkip] Help displayed via keyboard shortcut');
-      return;
-    }
-  });
+  videoManager.addEventListener('seeked', () => checkForSkip(video));
 }
 
-// Handle messages from popup
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[SponsorSkip] Message received:', message);
-
-  switch (message.type) {
-    case 'SETTINGS_UPDATED':
-      const settings = message.settings;
-      const previousAction = sponsorAction;
-      isEnabled = settings.enabled;
-      sponsorAction = settings.sponsorAction || 'skip';
-      skipAds = settings.skipAds !== undefined ? settings.skipAds : true;
-      console.log('[SponsorSkip] Settings updated:', settings);
-      console.log(
-        '[SponsorSkip] Enabled state:',
-        isEnabled,
-        'Action:',
-        sponsorAction,
-        'SkipAds:',
-        skipAds
-      );
-
-      // Update ad detection based on new settings
-      if (skipAds) {
-        startAdDetectionLoop();
-      } else {
-        stopAdDetectionLoop();
-      }
-
-      // Restore volume when switching away from mute mode
-      if (previousAction === 'mute' && sponsorAction !== 'mute' && isMuted) {
-        const video = document.querySelector('video') as HTMLVideoElement;
-        if (video) {
-          video.volume = originalVolume;
-          isMuted = false;
-          console.log('[SponsorSkip] Volume restored when switching away from mute mode');
-        }
-      }
-
-      // If just enabled and in sponsor segment, take action immediately
-      if (isEnabled && sponsorAction !== 'ignore') {
-        const video = document.querySelector('video') as HTMLVideoElement;
-        if (video) {
-          console.log('[SponsorSkip] Extension enabled - checking for immediate action');
-          checkForSkip(video);
-        }
-      }
-
-      sendResponse({ success: true, enabled: isEnabled, action: sponsorAction, skipAds: skipAds });
-      break;
-
-    case 'GET_STATS':
-      const stats = {
-        totalSkips: totalSkips,
-        timeSaved: totalTimeSaved,
-      };
-      console.log('[SponsorSkip] Sending stats:', stats);
-      sendResponse(stats);
-      break;
-
-    default:
-      console.log('[SponsorSkip] Unknown message type:', message.type);
-      sendResponse({ success: false });
+// Message Listener
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'SETTINGS_UPDATED') {
+    updateState(msg.settings);
+    sendResponse({ success: true, ...state });
+  } else if (msg.type === 'GET_STATS') {
+    sendResponse({ totalSkips, timeSaved: totalTimeSaved });
   }
-
   return true;
 });
 
-// Cleanup on page unload
+// Cleanup
 window.addEventListener('beforeunload', () => {
-  console.log('[SponsorSkip] Page unloading, cleaning up');
-  if (progressVisualizer) {
-    progressVisualizer.destroy();
-  }
-  if (adDetectionInterval) {
-    stopAdDetectionLoop();
-  }
+  if (progressVisualizer) progressVisualizer.destroy();
+  stopAdDetectionLoop();
+  videoManager.destroy();
 });
 
-// Start initialization
 initialize();
-
-// Load segments initially
-console.log('[SponsorSkip] Loading segments for current video...');
-loadSegments();
-
-// Listen for URL changes (YouTube SPA navigation)
-let lastUrl = location.href;
-console.log('[SponsorSkip] Setting up URL change listener for:', lastUrl);
-new MutationObserver(() => {
-  const url = location.href;
-  if (url !== lastUrl) {
-    console.log('[SponsorSkip] URL changed from', lastUrl, 'to', url);
-    lastUrl = url;
-    setTimeout(() => {
-      console.log('[SponsorSkip] Loading segments after URL change...');
-      loadSegments();
-    }, 1000);
-  }
-}).observe(document, { subtree: true, childList: true });
-
-// --- Instant Skip Ad Button Observer ---
-
-function setupInstantSkipAdObserver() {
-  const skipButtonSelectors = [
-    '.ytp-skip-ad-button',
-    '.ytp-skip-ad-button__text',
-    '.ytp-ad-skip-button',
-    '.ytp-ad-skip-button-modest',
-    '.ytp-ad-skip-button-container button',
-    'button[aria-label*="Skip"]',
-    'button[aria-label*="skip"]',
-    '.ytp-ad-skip-button-slot button',
-    '[data-tooltip-target-id="ytp-ad-skip-button"]',
-    'button[id*="skip-button"]',
-  ];
-
-  function simulateUserClick(btn: HTMLElement) {
-    // Simulate a real user click for best compatibility
-    btn.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-    btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    btn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-    btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  }
-
-  function trySkipAdButtonAndAdvanceVideo() {
-    const player = document.getElementById('movie_player');
-    if (!player || !player.classList.contains('ad-showing')) {
-      return; // Only act if ad is showing
-    }
-    for (const selector of skipButtonSelectors) {
-      const btn = document.querySelector(selector) as HTMLElement;
-      if (btn && btn.offsetParent !== null) {
-        if (btn instanceof HTMLButtonElement && btn.disabled) continue;
-        simulateUserClick(btn);
-        console.log('[SponsorSkip] Instantly simulated user click on Skip Ad button');
-        // Only advance ad video if player is in ad-showing mode
-        const adVideo = player.querySelector('video');
-        if (adVideo && adVideo.duration > 0 && adVideo.currentTime < adVideo.duration - 0.5) {
-          adVideo.currentTime = adVideo.duration;
-          console.log('[SponsorSkip] Advanced ad video to end (ad-showing)');
-        }
-        break;
-      }
-    }
-  }
-
-  // Fastest polling: requestAnimationFrame loop
-  function rafLoop() {
-    trySkipAdButtonAndAdvanceVideo();
-    window.requestAnimationFrame(rafLoop);
-  }
-  window.requestAnimationFrame(rafLoop);
-
-  // Also keep the MutationObserver as a backup
-  const observer = new MutationObserver(() => {
-    trySkipAdButtonAndAdvanceVideo();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-}
-
-setupInstantSkipAdObserver();
-
-console.log('[SponsorSkip] Simple skipper ready');

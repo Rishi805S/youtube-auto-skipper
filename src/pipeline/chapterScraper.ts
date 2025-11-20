@@ -1,87 +1,85 @@
 import { Segment } from '../types/types';
+import { clickWithRetry, timestampToSeconds } from '../utils/domHelpers';
+import { VideoManager } from '../utils/VideoManager';
 
-// --- TIER 2: CHAPTERS FROM DESCRIPTION ANCHORS ---
-// A robust click-with-retry helper
-async function clickWithRetry(selector: string, attempts = 5, delay = 300): Promise<void> {
-  for (let i = 0; i < attempts; i++) {
-    const btn = document.querySelector<HTMLElement>(selector);
-    if (btn) {
-      btn.click();
-      return;
-    }
-    await new Promise((r) => setTimeout(r, delay));
-  }
-  throw new Error(`Element not found after ${attempts} attempts: ${selector}`);
-}
+/**
+ * TIER 1: Extract sponsor segments from YouTube description chapters
+ */
 
-// Matches “MM:SS” or “HH:MM:SS” anywhere in the text
-const TIME_RE = /(\d{1,2}(?::\d{2}){1,2})/;
+// Matches "MM:SS" or "HH:MM:SS" anywhere in the text
+const TIME_RE = /(\\d{1,2}(?::\\d{2}){1,2})/;
 
-// convert “M:SS” or “H:MM:SS” → seconds
-function toSeconds(ts: string): number {
-  const parts = ts.split(':').map(Number);
-  if (parts.length === 3) {
-    const [h, m, s] = parts;
-    return h * 3600 + m * 60 + s;
-  }
-  const [m, s] = parts;
-  return m * 60 + s;
-}
-
-// Main Tier 2 entry point
+/**
+ * Main Tier 1 entry point
+ */
 export async function scrapeChapterSegments(): Promise<Segment[]> {
-  console.log('[Tier 2] Expanding description…');
-  await clickWithRetry('#expand');
-  await new Promise((r) => setTimeout(r, 200)); // let YT render
+  console.log('[Tier 1] Expanding description…');
+  
+  try {
+    await clickWithRetry('#expand');
+    await new Promise((resolve) => setTimeout(resolve, 200)); // Let YouTube render
 
-  // grab ALL anchors under #description
-  const all = Array.from(document.querySelectorAll<HTMLAnchorElement>('#description a'));
-  console.log('[Tier 2] Total anchors:', all.length);
+    // Grab all anchors under #description
+    const allAnchors = Array.from(
+      document.querySelectorAll<HTMLAnchorElement>('#description a')
+    );
+    console.log('[Tier 1] Total anchors:', allAnchors.length);
 
-  // pick only those whose text contains a timestamp
-  const tsAnchors = all.filter((a) => TIME_RE.test(a.textContent!));
-  console.log('[Tier 2] Anchors with timestamps in text:', tsAnchors.length);
+    // Filter anchors that contain timestamps
+    const timestampAnchors = allAnchors.filter((anchor) =>
+      TIME_RE.test(anchor.textContent || '')
+    );
+    console.log('[Tier 1] Anchors with timestamps:', timestampAnchors.length);
 
-  if (!tsAnchors.length) {
-    console.warn('[Tier 2] No timestamp‐text anchors found');
+    if (!timestampAnchors.length) {
+      console.warn('[Tier 1] No timestamp anchors found');
+      return [];
+    }
+
+    // Map each anchor to { start, end, title }
+    const videoManager = VideoManager.getInstance();
+    const duration = videoManager.getDuration();
+    
+    const chapters = timestampAnchors.map((anchor, index) => {
+      // Extract timestamp from text
+      const text = anchor.textContent!.trim();
+      const match = text.match(TIME_RE)!;
+      const start = timestampToSeconds(match[1]);
+
+      // Next anchor's timestamp becomes this chapter's end
+      const nextAnchor = timestampAnchors[index + 1];
+      const end = nextAnchor
+        ? timestampToSeconds(nextAnchor.textContent!.match(TIME_RE)![1])
+        : duration;
+
+      // Derive chapter title
+      let title = '';
+      const maybeTitleAnchor = anchor.nextElementSibling as HTMLAnchorElement | null;
+      
+      if (maybeTitleAnchor && !TIME_RE.test(maybeTitleAnchor.textContent || '')) {
+        title = maybeTitleAnchor.textContent!.trim();
+      } else {
+        // Fallback: take first non-timestamp line
+        const lines = text
+          .split('\\n')
+          .map((line) => line.trim())
+          .filter((line) => line && !TIME_RE.test(line));
+        title = lines[0] || '';
+      }
+
+      return { start, end, title };
+    });
+
+    // Filter only chapters with "sponsor" in title
+    const sponsorChapters = chapters.filter((chapter) =>
+      /sponsor/i.test(chapter.title)
+    );
+    console.log('[Tier 1] Sponsor chapters:', sponsorChapters);
+
+    // Return segments (start/end only)
+    return sponsorChapters.map(({ start, end }) => ({ start, end }));
+  } catch (error) {
+    console.error('[Tier 1] Chapter scraping failed:', error);
     return [];
   }
-
-  // Map each to { start, end, title }
-  const video = document.querySelector<HTMLVideoElement>('video')!;
-  const duration = video.duration;
-  const cues = tsAnchors.map((a, idx) => {
-    // pull out the ts from the text
-    const txt = a.textContent!.trim();
-    const m = txt.match(TIME_RE)!;
-    const start = toSeconds(m[1]);
-
-    // next anchor’s timestamp → end
-    const next = tsAnchors[idx + 1];
-    const end = next ? toSeconds(next.textContent!.match(TIME_RE)![1]) : duration;
-
-    // derive title:
-    // 1) look for a sibling <a> that has NO timestamp
-    let title = '';
-    const maybeTitleA = a.nextElementSibling as HTMLAnchorElement | null;
-    if (maybeTitleA && !TIME_RE.test(maybeTitleA.textContent!)) {
-      title = maybeTitleA.textContent!.trim();
-    } else {
-      // 2) fallback: take the first non‐timestamp line
-      const lines = txt
-        .split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l && !TIME_RE.test(l));
-      title = lines[0] || '';
-    }
-
-    return { start, end, title };
-  });
-
-  // filter only “Sponsor”
-  const sponsorCues = cues.filter((c) => /sponsor/i.test(c.title));
-  console.log('[Tier 2] Sponsor cues:', sponsorCues);
-
-  // return just start/end
-  return sponsorCues.map(({ start, end }) => ({ start, end }));
 }

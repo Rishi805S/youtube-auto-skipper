@@ -1,49 +1,67 @@
-# YouTube Auto Skipper
+# YouTube Auto Skipper (SponsorSkip)
 
-## Overview
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-YouTube Auto Skipper is a browser extension that automatically detects and skips sponsored segments and ads in YouTube videos. It uses a three-tiered detection system (description chapters, SponsorBlock API, transcript heuristics) to maximize accuracy and coverage. The extension provides a seamless viewing experience, real-time notifications, and user controls.
+A powerful, privacy-focused Chrome extension that automatically detects and skips sponsored segments, intros, outros, and ads in YouTube videos. Built with TypeScript and Manifest V3.
 
-## Features
+## 🚀 Key Features
 
-- Automatic sponsor and ad skipping
-- Three-tiered segment detection
-- Progress bar visualization of segments
-- UI controls and notifications
-- Statistics tracking (time saved, skips)
-- Robust handling of YouTube SPA navigation
-- Unit and E2E tested for reliability
+- **Smart Detection:** Uses a three-tiered approach (Chapters -> SponsorBlock API -> Transcript Analysis) for maximum accuracy.
+- **Ad Auto-Skip:** Instantly clicks "Skip Ad" buttons and fast-forwards unskippable ads.
+- **Customizable Actions:** Choose to **Skip**, **Mute**, or **Notify** for detected segments.
+- **Privacy First:** All processing happens locally or via anonymous API calls. No personal data is collected.
+- **Performance:** Lightweight and optimized for low latency (<100ms reaction time).
 
-## Installation
+## 🛠️ Tech Stack
 
-1. Clone or download this repository.
-2. Run `npm install` to install dependencies.
-3. Run `npm run build` to build the extension.
-4. Load the `dist/` or `build/` directory as an unpacked extension in Chrome (chrome://extensions > Load unpacked).
+- **Core:** TypeScript, HTML5, CSS3
+- **Platform:** Chrome Extensions API (Manifest V3)
+- **Build Tool:** Rollup
+- **Testing:** Jest (Unit), Playwright (E2E)
+- **Linting:** ESLint, Prettier
 
-## Usage
+## 📦 Installation
 
-- The extension will automatically skip sponsor segments and ads on YouTube videos.
-- Use the toggle button and UI controls injected into the YouTube player to enable/disable skipping and view stats.
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/yourusername/youtube-auto-skipper.git
+    cd youtube-auto-skipper
+    ```
 
-## Configuration
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
 
-- Settings can be adjusted via the popup or UI controls.
-- Keyboard shortcuts are available for quick actions (see documentation).
+3.  **Build the extension:**
+    ```bash
+    npm run build
+    ```
+    This will generate a `dist/` folder.
 
-## Testing
+4.  **Load into Chrome:**
+    - Open `chrome://extensions/`
+    - Enable **Developer mode** (top right).
+    - Click **Load unpacked**.
+    - Select the `dist/` folder.
 
-- Run `npm test` for unit tests (Jest).
-- Run `npx playwright test` for E2E tests (Playwright).
+## 🎮 Usage
 
-## Tech Stack
+- **Toggle Extension:** Click the extension icon or use `Alt+S`.
+- **Change Action:**
+    - `Alt+1`: Skip segments (Default)
+    - `Alt+2`: Mute segments
+    - `Alt+3`: Watch (Notify only)
+- **Toggle Ad Skipping:** `Alt+A`
+- **View Stats:** `Alt+D`
 
-- TypeScript, Chrome Extensions API, Jest, Playwright, Rollup, ESLint, Prettier
+## 🧪 Development
 
-## Contributing
+- **Watch Mode:** `npm run watch` (Rebuilds on file change)
+- **Run Unit Tests:** `npm test`
+- **Run E2E Tests:** `npm run test:e2e`
 
-Pull requests and suggestions are welcome!
+## 📄 License
 
-## License
-
-MIT
+This project is licensed under the MIT License.
