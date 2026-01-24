@@ -195,8 +195,338 @@ The extension has 3 distinct parts that need to talk to each other:
     *   **Method:** `window.postMessage`
     *   **Use Case:** The `InjectorService` (in Page Context) finds the transcript URL and posts it. The Content Script listens for `message` events to receive it.
 
+### Message Passing Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Popup
+    participant Background
+    participant Content
+    participant YouTube
+
+    User->>Popup: Click "Mute Mode"
+    Popup->>Background: sendMessage(SETTINGS_UPDATED)
+    Background->>Chrome Storage: Save settings
+    Background->>Content: sendMessage(SETTINGS_CHANGED)
+    Content->>Content: Update local state
+    Content->>YouTube: Apply mute action
+    YouTube-->>User: Muted segment playback
+```
+
 ### Example: Changing a Setting
 1.  User clicks "Mute Mode" in Popup.
 2.  Popup sends `{ type: 'SETTINGS_UPDATED', settings: { sponsorAction: 'mute' } }`.
 3.  Content Script receives message -> Updates local `state` variable.
 4.  Next `timeupdate` loop uses the new `mute` logic.
+
+---
+
+## 6. Architecture Diagrams
+
+### Data Flow for Segment Detection
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      YouTube Page Loads                      │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Content Script Initialization                   │
+│  • MutationObserver detects video element                   │
+│  • Extract video ID from URL                                │
+│  • Load settings from chrome.storage                        │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│              getSegmentsByPriority(videoId)                 │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+         ┌───────────────┼───────────────┐
+         ▼               ▼               ▼
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│   TIER 1    │  │   TIER 2    │  │   TIER 3    │
+│  Chapters   │  │ SponsorBlock│  │ Transcript  │
+│   (50ms)    │  │   (200ms)   │  │  (1000ms)   │
+└──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+       │                │                │
+       │ if empty       │ if empty       │
+       └────────────────┴────────────────┘
+                        │
+                        ▼
+            ┌───────────────────────┐
+            │  normalizeSegments()  │
+            │  • Sort by start      │
+            │  • Merge overlaps     │
+            │  • Add padding        │
+            └───────────┬───────────┘
+                        │
+                        ▼
+            ┌───────────────────────┐
+            │  Initialize UI        │
+            │  • Progress markers   │
+            │  • Event listeners    │
+            └───────────┬───────────┘
+                        │
+                        ▼
+            ┌───────────────────────┐
+            │   Monitor Playback    │
+            │  video.timeupdate     │
+            └───────────┬───────────┘
+                        │
+                        ▼
+            ┌───────────────────────┐
+            │  Inside segment?      │
+            └───────────┬───────────┘
+                        │
+                 ┌──────┴──────┐
+                 ▼             ▼
+            ┌────────┐    ┌────────┐
+            │  Skip  │    │  Mute  │
+            └────────┘    └────────┘
+```
+
+### Segment Detection Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    participant Video as Video Element
+    participant Content as Content Script
+    participant Tier1 as Chapter Scraper
+    participant Tier2 as SponsorBlock API
+    participant Tier3 as Transcript Parser
+    participant UI as Progress Bar
+
+    Video->>Content: New video detected
+    Content->>Content: Extract video ID
+    
+    Content->>Tier1: scrapeChapterSegments()
+    Tier1->>Tier1: Click "Show more"
+    Tier1->>Tier1: Parse description
+    Tier1-->>Content: segments[] or []
+    
+    alt Tier 1 found segments
+        Content->>UI: Render markers
+    else Tier 1 empty
+        Content->>Tier2: fetchSponsorBlockSegments(videoId)
+        Tier2->>Tier2: HTTP GET to API
+        Tier2-->>Content: segments[] or []
+        
+        alt Tier 2 found segments
+            Content->>UI: Render markers
+        else Tier 2 empty
+            Content->>Tier3: parseTranscriptSegments()
+            Tier3->>Tier3: Inject script
+            Tier3->>Tier3: Fetch captions
+            Tier3->>Tier3: Analyze keywords
+            Tier3-->>Content: segments[] or []
+            Content->>UI: Render markers (if any)
+        end
+    end
+    
+    Content->>Video: Add timeupdate listener
+```
+
+### Content Script Initialization Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Page Load / SPA Navigation                │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+                 ┌───────────────┐
+                 │ MutationObserver │
+                 │  watching DOM   │
+                 └───────┬─────────┘
+                         │
+                         ▼
+                 ┌───────────────┐
+                 │ Video Element │
+                 │   Detected    │
+                 └───────┬───────┘
+                         │
+         ┌───────────────┼───────────────┐
+         ▼               ▼               ▼
+┌────────────────┐ ┌──────────────┐ ┌─────────────┐
+│ Load Settings  │ │ Initialize   │ │ Setup Video │
+│ from Storage   │ │ InputHandler │ │  Listeners  │
+└────────┬───────┘ └──────┬───────┘ └──────┬──────┘
+         │                │                │
+         └────────────────┴────────────────┘
+                         │
+                         ▼
+                 ┌───────────────┐
+                 │ loadSegments()│
+                 └───────┬───────┘
+                         │
+                         ▼
+                 ┌───────────────┐
+                 │ Render UI     │
+                 │ • Markers     │
+                 │ • Toasts      │
+                 └───────┬───────┘
+                         │
+                         ▼
+                 ┌───────────────┐
+                 │ Start Monitoring│
+                 │ • timeupdate  │
+                 │ • Ad detection│
+                 └───────────────┘
+```
+
+### State Machine Diagram
+
+```
+                    ┌─────────────┐
+                    │  DISABLED   │◄─────────┐
+                    └──────┬──────┘          │
+                           │                 │
+                      Alt+S pressed          │
+                           │                 │
+                           ▼                 │
+                    ┌─────────────┐          │
+              ┌────►│   ENABLED   │          │
+              │     └──────┬──────┘          │
+              │            │                 │
+              │     Video detected           │
+              │            │                 │
+              │            ▼                 │
+              │     ┌─────────────┐          │
+              │     │  DETECTING  │          │
+              │     └──────┬──────┘          │
+              │            │                 │
+              │    Segments found            │
+              │            │                 │
+              │            ▼                 │
+              │     ┌─────────────┐    Alt+S pressed
+              └─────┤ MONITORING  ├──────────┘
+                    └──────┬──────┘
+                           │
+                    Inside segment?
+                           │
+              ┌────────────┼────────────┐
+              ▼            ▼            ▼
+        ┌─────────┐  ┌─────────┐  ┌─────────┐
+        │ SKIP    │  │ MUTE    │  │ NOTIFY  │
+        │ (Alt+1) │  │ (Alt+2) │  │ (Alt+3) │
+        └─────────┘  └─────────┘  └─────────┘
+              │            │            │
+              └────────────┴────────────┘
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │ MONITORING  │ ◄─ (loop back)
+                    └─────────────┘
+```
+
+### Component Dependency Graph
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                        Extension                              │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌─────────────┐          ┌──────────────┐                  │
+│  │  Background │◄────────►│   Popup      │                  │
+│  │   Service   │          │   (UI)       │                  │
+│  │   Worker    │          └──────────────┘                  │
+│  └──────┬──────┘                                            │
+│         │                                                    │
+│         │ manages                                            │
+│         │                                                    │
+│         ▼                                                    │
+│  ┌─────────────┐                                            │
+│  │  Chrome     │                                            │
+│  │  Storage    │                                            │
+│  └─────────────┘                                            │
+│                                                               │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │              Content Script                           │   │
+│  ├──────────────────────────────────────────────────────┤   │
+│  │                                                        │   │
+│  │  ┌────────────────────────────────────────────────┐  │   │
+│  │  │           Main Orchestrator                    │  │   │
+│  │  │        (simple-skipper.ts)                     │  │   │
+│  │  └─────┬───────────────────────────────────┬──────┘  │   │
+│  │        │                                    │         │   │
+│  │        ▼                                    ▼         │   │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐          │   │
+│  │  │  Engine  │  │ Features │  │    UI    │          │   │
+│  │  └────┬─────┘  └────┬─────┘  └────┬─────┘          │   │
+│  │       │             │              │                 │   │
+│  │       ├─────────────┴──────────────┘                │   │
+│  │       │                                              │   │
+│  │       ▼                                              │   │
+│  │  ┌──────────┐                                       │   │
+│  │  │  Utils   │                                       │   │
+│  │  └──────────┘                                       │   │
+│  │                                                        │   │
+│  └────────────────────────────────────────────────────────┘   │
+│                                                               │
+└──────────────────────────────────────────────────────────────┘
+
+Legend:
+  → depends on
+  ◄──► bidirectional communication
+```
+
+### Timeline: Component Activation
+
+```
+Time (ms)
+  0    │ ┌──────────────────────────────────────┐
+       │ │     Background Service Worker        │
+       │ │     (Always listening for events)    │
+       │ └──────────────────────────────────────┘
+       │
+  50   │ ┌──────────────────────────────────────┐
+       │ │     Content Script Injected          │
+       │ └──────────────────────────────────────┘
+       │
+ 100   │ ┌──────────────────────────────────────┐
+       │ │     Video Element Detected           │
+       │ │     (MutationObserver)               │
+       │ └──────────────────────────────────────┘
+       │
+ 150   │ ┌──────────────────────────────────────┐
+       │ │     InputHandler Initialized         │
+       │ │     (Keyboard shortcuts active)      │
+       │ └──────────────────────────────────────┘
+       │
+ 200   │ ┌──────────────────────────────────────┐
+       │ │     Segment Detection Started        │
+       │ │     (Tier 1: Chapter scraping)       │
+       │ └──────────────────────────────────────┘
+       │
+ 250   │ ┌──────────────────────────────────────┐
+       │ │     Tier 1 Complete (if found)       │
+       │ └──────────────────────────────────────┘
+       │
+ 400   │ ┌──────────────────────────────────────┐
+       │ │     Tier 2: SponsorBlock API Call    │
+       │ │     (if Tier 1 empty)                │
+       │ └──────────────────────────────────────┘
+       │
+ 600   │ ┌──────────────────────────────────────┐
+       │ │     Progress Bar Visualizer          │
+       │ │     (Red markers rendered)           │
+       │ └──────────────────────────────────────┘
+       │
+ 800   │ ┌──────────────────────────────────────┐
+       │ │     timeupdate Listener Active       │
+       │ │     (Monitoring playback)            │
+       │ └──────────────────────────────────────┘
+       │
+1200   │ ┌──────────────────────────────────────┐
+       │ │     Tier 3: Transcript Analysis      │
+       │ │     (if Tier 2 empty)                │
+       │ └──────────────────────────────────────┘
+       │
+Ongoing│ ┌──────────────────────────────────────┐
+       │ │     Ad Detection Loop                │
+       │ │     (Every 1s if enabled)            │
+       │ └──────────────────────────────────────┘
+```
