@@ -1,9 +1,5 @@
 import { InjectorService } from '../services/InjectorService';
 
-// This file is now clean and doesn't need ts-ignore or ts-expect-error.
-// The logic from previous steps was moved to other files.
-// This is the clean, final version.
-
 console.log('[SponsorSkip] Background script started.');
 
 chrome.webNavigation.onHistoryStateUpdated.addListener(

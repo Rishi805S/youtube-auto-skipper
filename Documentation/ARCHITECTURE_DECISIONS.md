@@ -1,3 +1,5 @@
+<!-- CTO -->
+
 # Architecture Decisions
 
 Documentation of key architectural choices, their rationale, trade-offs, and alternatives considered for youtube-auto-skipper.

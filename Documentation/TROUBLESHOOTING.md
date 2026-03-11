@@ -1,3 +1,5 @@
+<!-- CTO -->
+
 # Troubleshooting & Debug Guide
 
 Comprehensive guide to diagnosing and fixing common issues with youtube-auto-skipper.

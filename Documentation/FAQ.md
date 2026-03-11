@@ -1,3 +1,5 @@
+<!-- CTO -->
+
 # Frequently Asked Questions (FAQ)
 
 Common questions about youtube-auto-skipper for users, developers, and contributors.

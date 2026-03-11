@@ -1,3 +1,5 @@
+<!-- CTO -->
+
 # API Reference
 
 Complete API documentation for all modules and functions in youtube-auto-skipper.

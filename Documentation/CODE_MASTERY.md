@@ -1,3 +1,5 @@
+<!-- CTO -->
+
 # Code Mastery: YouTube Auto Skipper
 
 > **Objective:** This document is designed to take a new developer from "zero" to "master" of the codebase. It covers architecture, file structure, critical logic, and data flow.

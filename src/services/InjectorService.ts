@@ -35,8 +35,6 @@ export class InjectorService {
               }
             }
             
-            // Retry if not found yet, but limit retries or just keep polling?
-            // Original code kept polling. We'll add a safety check.
             setTimeout(waitForTracks, 50);
           } catch (e) {
             console.error('[SponsorSkip] Error finding caption tracks:', e);
