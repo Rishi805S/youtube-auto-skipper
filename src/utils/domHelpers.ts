@@ -8,11 +8,7 @@
  * @param attempts Number of retry attempts
  * @param delay Delay between attempts in ms
  */
-export async function clickWithRetry(
-  selector: string,
-  attempts = 5,
-  delay = 300
-): Promise<void> {
+export async function clickWithRetry(selector: string, attempts = 5, delay = 300): Promise<void> {
   for (let i = 0; i < attempts; i++) {
     const element = document.querySelector<HTMLElement>(selector);
     if (element) {
@@ -29,13 +25,10 @@ export async function clickWithRetry(
  * @param selector CSS selector for the element
  * @param timeout Maximum wait time in ms
  */
-export async function waitForElement<T extends HTMLElement>(
-  selector: string,
-  timeout = 3000
-): Promise<T> {
+export async function waitForElement(selector: string, timeout = 3000): Promise<HTMLElement> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
-    const element = document.querySelector<T>(selector);
+    const element = document.querySelector<HTMLElement>(selector);
     if (element) return element;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -46,11 +39,9 @@ export async function waitForElement<T extends HTMLElement>(
  * Finds the first visible element from a list of selectors
  * @param selectors Array of CSS selectors to try
  */
-export function findFirstVisible<T extends HTMLElement>(
-  selectors: string[]
-): T | null {
+export function findFirstVisible(selectors: string[]): HTMLElement | null {
   for (const selector of selectors) {
-    const element = document.querySelector<T>(selector);
+    const element = document.querySelector<HTMLElement>(selector);
     if (element && element.offsetParent !== null) {
       return element;
     }
@@ -77,12 +68,12 @@ export function timestampToSeconds(timestamp: string): number {
  * @param func Function to debounce
  * @param wait Wait time in ms
  */
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
+export function debounce(
+  func: (...args: unknown[]) => void | Promise<void>,
   wait: number
-): (...args: Parameters<T>) => void {
+): (...args: unknown[]) => void {
   let timeout: NodeJS.Timeout | null = null;
-  return (...args: Parameters<T>) => {
+  return (...args: unknown[]) => {
     if (timeout) clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   };

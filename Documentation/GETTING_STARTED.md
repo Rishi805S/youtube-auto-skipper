@@ -10,12 +10,11 @@ Complete guide to setting up your development environment and making your first 
 2. [Installation](#installation)
 3. [Building the Extension](#building-the-extension)
 4. [Loading in Chrome](#loading-in-chrome)
-5. [Testing Your Setup](#testing-your-setup)
+5. [Verifying Your Setup](#verifying-your-setup)
 6. [Development Workflow](#development-workflow)
-7. [Running Tests](#running-tests)
-8. [Code Quality Tools](#code-quality-tools)
-9. [Common Setup Issues](#common-setup-issues)
-10. [Next Steps](#next-steps)
+7. [Code Quality Tools](#code-quality-tools)
+8. [Common Setup Issues](#common-setup-issues)
+9. [Next Steps](#next-steps)
 
 ---
 
@@ -86,15 +85,12 @@ npm install
 
 This will:
 - Install all Node.js dependencies
-- Download Playwright browser binaries (for E2E tests)
-- Set up TypeScript, Rollup, Jest, etc.
+- Set up TypeScript, Rollup, ESLint, and Prettier
 
 **Expected output:**
 ```
 added 450 packages in 30s
 ```
-
-**Note:** The first install may take 2-5 minutes due to Playwright setup.
 
 ### 3. Verify Installation
 
@@ -109,9 +105,8 @@ npx tsc --version
 npx rollup --version
 # Output: rollup v4.18.0
 
-# Check Jest test runner
-npx jest --version
-# Output: 30.0.5
+# Check ESLint
+npx eslint --version
 ```
 
 ---
@@ -231,7 +226,7 @@ The extension card should show:
 
 ---
 
-## Testing Your Setup
+## Verifying Your Setup
 
 ### Quick Test Checklist
 
@@ -302,13 +297,9 @@ Use these videos to test different scenarios:
 # Terminal 1: Start watch mode
 npm run watch
 
-# Terminal 2: Run tests on file changes
-npm run test:watch
-
 # Make changes in VS Code
 # → Save file
 # → Rollup rebuilds (Terminal 1)
-# → Tests re-run (Terminal 2)
 # → Reload extension in Chrome
 ```
 
@@ -331,77 +322,6 @@ Install "Extensions Reloader" extension for one-click reload:
 ### Hot Reload (Not Supported)
 
 ⚠️ **Note:** Chrome extensions do not support true hot reload. You must manually reload after every change.
-
----
-
-## Running Tests
-
-### Unit Tests
-
-Run all unit tests:
-```bash
-npm test
-```
-
-**Watch mode (recommended for TDD):**
-```bash
-npm run test:watch
-```
-
-**Run specific test file:**
-```bash
-npm test -- tieredFetcher.test.ts
-```
-
-**Run with coverage:**
-```bash
-npm test -- --coverage
-```
-
-**Expected output:**
-```
-PASS  tests/unit/tieredFetcher.test.ts
-  ✓ returns normalized chapters if available (5 ms)
-  ✓ returns normalized SponsorBlock segments if chapters unavailable (3 ms)
-  ✓ returns empty array if all sources fail (2 ms)
-
-Test Suites: 5 passed, 5 total
-Tests:       15 passed, 15 total
-Time:        2.5s
-```
-
-### End-to-End Tests
-
-Run Playwright E2E tests:
-```bash
-npm run test:e2e
-```
-
-**Run in headed mode (see browser):**
-```bash
-npx playwright test --headed
-```
-
-**Run specific test:**
-```bash
-npx playwright test sponsorSkip
-```
-
-**Debug mode:**
-```bash
-npx playwright test --debug
-```
-
-**Expected output:**
-```
-Running 3 tests using 1 worker
-
-  ✓ [chromium] › sponsorSkip.test.ts:5:1 › loads YouTube page (1.2s)
-  ✓ [chromium] › sponsorSkip.test.ts:12:1 › injects content script (0.8s)
-  ✓ [chromium] › sponsorSkip.test.ts:20:1 › detects video ID (1.1s)
-
-  3 passed (3.1s)
-```
 
 ---
 
@@ -471,12 +391,11 @@ Before committing, run:
 npm run lint
 npm run format-check
 npm run build:ts
-npm test
 ```
 
 Or create a single command in `package.json`:
 ```json
-"precommit": "npm run lint && npm run format-check && npm run build:ts && npm test"
+"precommit": "npm run lint && npm run format-check && npm run build:ts"
 ```
 
 ---
@@ -564,27 +483,7 @@ npm install
 
 ---
 
-### Issue 5: Playwright tests fail to run
-
-**Error:**
-```
-browserType.launch: Executable doesn't exist at /path/to/chrome
-```
-
-**Solution:**
-Install Playwright browsers:
-```bash
-npx playwright install chrome
-```
-
-Or install all browsers:
-```bash
-npx playwright install
-```
-
----
-
-### Issue 6: Extension works but logs are missing
+### Issue 5: Extension works but logs are missing
 
 **Cause:** `Logger.isDebug` is set to `false`
 
@@ -602,7 +501,7 @@ npm run build
 
 ---
 
-### Issue 7: Changes not reflected after rebuild
+### Issue 6: Changes not reflected after rebuild
 
 **Cause:** Chrome caches extension files aggressively
 
@@ -614,7 +513,7 @@ npm run build
 
 ---
 
-### Issue 8: ESLint/Prettier conflicts
+### Issue 7: ESLint/Prettier conflicts
 
 **Error:**
 ```
@@ -655,11 +554,8 @@ npm run format
    src/ui/NotificationManager.ts     ← UI feedback
    ```
 
-3. **Run Existing Tests:**
-   ```bash
-   npm run test:watch
-   ```
-   Open test files to understand expected behavior.
+3. **Exercise Key Flows Manually:**
+   Open YouTube, trigger navigation changes, and verify the extension reacts correctly.
 
 ### Make Your First Change
 
@@ -690,11 +586,6 @@ npm run dev                # Development build + watch
 npm run build              # Production build
 npm run build:ts           # Type check only
 
-# Testing
-npm test                   # Run unit tests
-npm run test:watch         # Watch mode
-npm run test:e2e           # E2E tests
-
 # Code Quality
 npm run lint               # Check for errors
 npm run lint:fix           # Auto-fix errors
@@ -707,7 +598,6 @@ npm run format-check       # Check formatting
 ```
 src/                   ← Source code
 dist/                  ← Built extension (load this in Chrome)
-tests/                 ← Unit and E2E tests
 public/                ← Static assets (icons, popup.html)
 docs/                  ← Documentation
 ```

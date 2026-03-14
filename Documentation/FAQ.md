@@ -238,30 +238,10 @@ See [GETTING_STARTED.md](./GETTING_STARTED.md) for detailed walkthrough.
 **A:**
 ```bash
 npm run watch       # Auto-rebuild on changes (development)
-npm test            # Run unit tests
-npm run test:e2e    # Run E2E tests
 npm run lint        # Check code style
 npm run format      # Auto-format code
 npm run build       # Production build
 ```
-
----
-
-#### Q: How do I run tests?
-**A:**
-```bash
-# Unit tests (Jest)
-npm test                  # Run once
-npm run test:watch        # Watch mode
-npm test -- --coverage    # With coverage
-
-# E2E tests (Playwright)
-npm run test:e2e                # Headless
-npx playwright test --headed    # See browser
-npx playwright test --debug     # Debug mode
-```
-
-See [TESTING_DETAILED.md](./TESTING_DETAILED.md) for comprehensive guide.
 
 ---
 
@@ -321,40 +301,11 @@ See [MODULES.md](./MODULES.md) for detailed breakdown.
 1. **Create Issue:** Describe feature and get feedback
 2. **Fork & Branch:** `git checkout -b feature/my-feature`
 3. **Implement:** Add code in appropriate module
-4. **Test:** Write unit tests and manually test
+4. **Validate:** Manually test the feature in the extension
 5. **Document:** Update relevant docs (API_REFERENCE, MODULES)
 6. **PR:** Submit pull request with description
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md#pull-request-process) for full process.
-
----
-
-#### Q: What's the best way to add a test?
-**A:**
-- **New function?** Add unit test in `tests/unit/`
-- **New user flow?** Add E2E test in `tests/e2e/`
-- **Bug fix?** Add regression test
-
-**Template:**
-```typescript
-import { myFunction } from '../../src/module/myModule';
-
-describe('myFunction', () => {
-  it('handles normal case', () => {
-    expect(myFunction('input')).toBe('output');
-  });
-
-  it('handles edge case', () => {
-    expect(myFunction('')).toBe(null);
-  });
-
-  it('handles error case', () => {
-    expect(() => myFunction(null)).toThrow();
-  });
-});
-```
-
-See [TESTING_DETAILED.md](./TESTING_DETAILED.md) for comprehensive examples.
 
 ---
 

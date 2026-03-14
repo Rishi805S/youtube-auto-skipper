@@ -977,7 +977,6 @@ if (!state.isEnabled || !segments.length) return;
 ## Cross-References
 
 - **Architecture:** See [CODE_MASTERY.md](./CODE_MASTERY.md) for system diagrams
-- **Testing:** See [TESTING_DETAILED.md](./TESTING_DETAILED.md) for unit test examples
 - **Troubleshooting:** See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for common issues
 - **Contributing:** See [CONTRIBUTING.md](./CONTRIBUTING.md) for development guidelines
 

@@ -1,3 +1,5 @@
+// Instead of using doc.queryselector(#movie_player) which is a bad practice
+// we can use this constant to get the player element
 export const CONFIG = {
   SELECTORS: {
     VIDEO: 'video',
@@ -18,24 +20,8 @@ export const CONFIG = {
   TIMEOUTS: {
     AD_CHECK_INTERVAL: 1000,
     SKIP_COOLDOWN: 3000,
-    TOAST_DURATION: 3000,
     URL_CHANGE_DELAY: 1000,
     VIDEO_CHECK_THROTTLE: 500,
-  },
-  STYLES: {
-    TOAST: `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #333;
-      color: white;
-      padding: 10px 15px;
-      border-radius: 5px;
-      z-index: 10000;
-      font-size: 14px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-      font-family: Roboto, Arial, sans-serif;
-    `,
   },
   DEFAULTS: {
     ENABLED: true,

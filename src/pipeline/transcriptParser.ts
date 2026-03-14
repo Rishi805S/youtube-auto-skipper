@@ -50,6 +50,20 @@ function parseTranscriptPanel(): Cue[] {
   });
 }
 
+async function getCaptions(trackUrl: string): Promise<Cue[]> {
+  const xml = await fetch(trackUrl).then((res) => res.text());
+
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xml, 'text/xml');
+
+  return Array.from(xmlDoc.querySelectorAll('text'))
+    .map((node) => ({
+      start: parseFloat(node.getAttribute('start') || '0'),
+      text: (node.textContent || '').replace(/\s+/g, ' ').trim(),
+    }))
+    .filter((cue) => cue.text.length > 0);
+}
+
 /**
  * Detect sponsor segments using keyword heuristics
  */
@@ -129,14 +143,22 @@ function detectSponsorSegments(cues: Cue[]): Segment[] {
 /**
  * Main Tier 3 entry point
  */
-export async function parseTranscriptSegments(): Promise<Segment[]> {
+export async function parseTranscriptSegments(trackUrl?: string | null): Promise<Segment[]> {
   try {
-    await openTranscriptPanel();
-    await waitForElement('ytd-transcript-renderer', 3000);
-    
-    const cues = parseTranscriptPanel();
+    let cues: Cue[] = [];
+
+    if (trackUrl) {
+      cues = await getCaptions(trackUrl);
+      console.log(`[Tier 3] Loaded ${cues.length} transcript cues from caption track`);
+    } else {
+      await openTranscriptPanel();
+      await waitForElement('ytd-transcript-renderer', 3000);
+      cues = parseTranscriptPanel();
+      console.log(`[Tier 3] Loaded ${cues.length} transcript cues from transcript panel`);
+    }
+
     const segments = detectSponsorSegments(cues);
-    
+
     console.log('[Tier 3] Detected segments from transcript:', segments);
     return segments;
   } catch (error) {

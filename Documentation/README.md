@@ -63,7 +63,6 @@ A powerful Chrome extension that saves you hours by intelligently detecting and 
 - **Core:** TypeScript, HTML5, CSS3
 - **Platform:** Chrome Extensions API (Manifest V3)
 - **Build Tool:** Rollup
-- **Testing:** Jest (Unit), Playwright (E2E)
 - **Linting:** ESLint, Prettier
 
 ## 📦 Installation
@@ -116,12 +115,10 @@ A powerful Chrome extension that saves you hours by intelligently detecting and 
 - **[Code Mastery](./CODE_MASTERY.md)** - Architecture overview
 - **[Modules Deep Dive](./MODULES.md)** - Detailed module documentation
 - **[API Reference](./API_REFERENCE.md)** - Complete function documentation
-- **[Testing Guide](./TESTING_DETAILED.md)** - How to write and run tests
 - **[Contributing](./CONTRIBUTING.md)** - How to contribute code
 
 ### Technical Deep Dives
 - **[Architecture Decisions](./ARCHITECTURE_DECISIONS.md)** - Why we made key design choices
-- **[Testing Examples](./TESTING_DETAILED.md)** - Real test code from the project
 
 ## 🛠️ Development
 
@@ -147,9 +144,6 @@ npm run build
 
 ```bash
 npm run watch         # Auto-rebuild on changes (development)
-npm test              # Run unit tests
-npm run test:watch    # Tests in watch mode
-npm run test:e2e      # Run end-to-end tests
 npm run lint          # Check code style
 npm run format        # Auto-format code
 npm run build         # Production build
@@ -163,7 +157,6 @@ We welcome contributions! Whether it's:
 - 🐛 Bug reports
 - 💡 Feature requests
 - 📝 Documentation improvements
-- 🧪 Test coverage
 - 💻 Code contributions
 
 **Start here:**
@@ -176,7 +169,6 @@ We welcome contributions! Whether it's:
 - **Detection Rate:** 85% of videos with sponsors
 - **Average Latency:** <100ms for skip actions
 - **Bundle Size:** ~50KB (minified)
-- **Test Coverage:** 85%+
 - **Active Development:** 2024
 
 ## 🗺️ Roadmap

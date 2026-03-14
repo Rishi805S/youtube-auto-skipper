@@ -1,67 +1,73 @@
 import { Segment } from '../types/types';
 import { clickWithRetry, timestampToSeconds } from '../utils/domHelpers';
-import { VideoManager } from '../utils/VideoManager';
+import { getVideo } from '../utils/VideoManager';
 
-/**
- * TIER 1: Extract sponsor segments from YouTube description chapters
- */
+const TIME_RE = /(\d{1,2}(?::\d{2}){1,2})/;
 
-// Matches "MM:SS" or "HH:MM:SS" anywhere in the text
-const TIME_RE = /(\\d{1,2}(?::\\d{2}){1,2})/;
+const chapterKeywords = [
+  'sponsor',
+  'sponsored',
+  'ad',
+  'ads',
+  'advertisement',
+  'promo',
+  'promotion',
+  'paid promotion',
+  'brand deal',
+  'thanks to',
+  'brought to you by',
+];
 
-/**
- * Main Tier 1 entry point
- */
+function getTimestampAnchors(): HTMLAnchorElement[] {
+  const allAnchors = Array.from(document.querySelectorAll<HTMLAnchorElement>('#description a'));
+  console.log('[Tier 1] Total anchors:', allAnchors.length);
+
+  const timestampAnchors = allAnchors.filter((anchor) => TIME_RE.test(anchor.textContent || ''));
+  console.log('[Tier 1] Anchors with timestamps:', timestampAnchors.length);
+
+  return timestampAnchors;
+}
+
+// Main Tier 1 entry point
 export async function scrapeChapterSegments(): Promise<Segment[]> {
-  console.log('[Tier 1] Expanding description…');
-  
+  console.log('[Tier 1] Expanding description...');
+
   try {
-    await clickWithRetry('#expand');
-    await new Promise((resolve) => setTimeout(resolve, 200)); // Let YouTube render
-
-    // Grab all anchors under #description
-    const allAnchors = Array.from(
-      document.querySelectorAll<HTMLAnchorElement>('#description a')
-    );
-    console.log('[Tier 1] Total anchors:', allAnchors.length);
-
-    // Filter anchors that contain timestamps
-    const timestampAnchors = allAnchors.filter((anchor) =>
-      TIME_RE.test(anchor.textContent || '')
-    );
-    console.log('[Tier 1] Anchors with timestamps:', timestampAnchors.length);
+    let timestampAnchors = getTimestampAnchors();
+    if (!timestampAnchors.length) {
+      console.log('[Tier 1] Description looks collapsed, clicking expand');
+      await clickWithRetry('#expand');
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      timestampAnchors = getTimestampAnchors();
+    } else {
+      console.log('[Tier 1] Description already expanded');
+    }
 
     if (!timestampAnchors.length) {
       console.warn('[Tier 1] No timestamp anchors found');
       return [];
     }
 
-    // Map each anchor to { start, end, title }
-    const videoManager = VideoManager.getInstance();
-    const duration = videoManager.getDuration();
-    
+    const duration = getVideo()?.duration || 0;
+
     const chapters = timestampAnchors.map((anchor, index) => {
-      // Extract timestamp from text
       const text = anchor.textContent!.trim();
       const match = text.match(TIME_RE)!;
       const start = timestampToSeconds(match[1]);
 
-      // Next anchor's timestamp becomes this chapter's end
       const nextAnchor = timestampAnchors[index + 1];
       const end = nextAnchor
         ? timestampToSeconds(nextAnchor.textContent!.match(TIME_RE)![1])
         : duration;
 
-      // Derive chapter title
       let title = '';
       const maybeTitleAnchor = anchor.nextElementSibling as HTMLAnchorElement | null;
-      
+
       if (maybeTitleAnchor && !TIME_RE.test(maybeTitleAnchor.textContent || '')) {
         title = maybeTitleAnchor.textContent!.trim();
       } else {
-        // Fallback: take first non-timestamp line
         const lines = text
-          .split('\\n')
+          .split('\n')
           .map((line) => line.trim())
           .filter((line) => line && !TIME_RE.test(line));
         title = lines[0] || '';
@@ -70,13 +76,16 @@ export async function scrapeChapterSegments(): Promise<Segment[]> {
       return { start, end, title };
     });
 
-    // Filter only chapters with "sponsor" in title
-    const sponsorChapters = chapters.filter((chapter) =>
-      /sponsor/i.test(chapter.title)
+    const normalizedChapters = chapters.map((chapter) => ({
+      ...chapter,
+      title: chapter.title.replace(/\s+/g, ' ').trim().toLowerCase(),
+    }));
+
+    const sponsorChapters = normalizedChapters.filter((chapter) =>
+      chapterKeywords.some((keyword) => chapter.title.toLowerCase().includes(keyword))
     );
     console.log('[Tier 1] Sponsor chapters:', sponsorChapters);
 
-    // Return segments (start/end only)
     return sponsorChapters.map(({ start, end }) => ({ start, end }));
   } catch (error) {
     console.error('[Tier 1] Chapter scraping failed:', error);

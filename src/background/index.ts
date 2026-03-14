@@ -2,26 +2,54 @@ import { InjectorService } from '../services/InjectorService';
 
 console.log('[SponsorSkip] Background script started.');
 
-chrome.webNavigation.onHistoryStateUpdated.addListener(
-  (details) => {
-    if (details.url && details.url.includes('youtube.com')) {
-      console.log(`[BG] Navigated to a video page. Injecting script into tab: ${details.tabId}`);
-
-      InjectorService.injectTrackUrlFetcher(details.tabId);
-    }
-  },
-  {
-    url: [{ hostContains: 'youtube.com/*' }],
+function getVideoIdFromUrl(url: string): string | null {
+  try {
+    return new URL(url).searchParams.get('v');
+  } catch {
+    return null;
   }
+}
+
+async function injectTrackUrlForNavigation(tabId: number, url?: string): Promise<void> {
+  if (!url || !url.includes('youtube.com')) {
+    return;
+  }
+
+  const videoId = getVideoIdFromUrl(url);
+  if (!videoId) {
+    return;
+  }
+
+  console.log(`[BG] Processing YouTube watch page in tab ${tabId} for video ${videoId}`);
+
+  const trackUrl = await InjectorService.injectTrackUrlFetcher(tabId);
+  if (trackUrl) {
+    try {
+      await chrome.tabs.sendMessage(tabId, {
+        type: 'TRACK_URL_FOUND',
+        trackUrl,
+        videoId,
+      });
+    } catch (error) {
+      console.warn('[BG] Could not deliver track URL to content script:', error);
+    }
+  }
+}
+
+const youtubeWatchFilter = {
+  url: [{ hostContains: 'youtube.com', pathContains: '/watch' }],
+};
+
+chrome.webNavigation.onCompleted.addListener(
+  async (details) => {
+    await injectTrackUrlForNavigation(details.tabId, details.url);
+  },
+  youtubeWatchFilter
 );
 
-// Handle popup opening request from content script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'OPEN_POPUP') {
-    console.log('[BG] Received request to open popup');
-    // Open the popup by clicking the extension icon
-    chrome.action.openPopup();
-    sendResponse({ success: true });
-  }
-  return true;
-});
+chrome.webNavigation.onHistoryStateUpdated.addListener(
+  async (details) => {
+    await injectTrackUrlForNavigation(details.tabId, details.url);
+  },
+  youtubeWatchFilter
+);

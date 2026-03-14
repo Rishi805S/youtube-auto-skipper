@@ -1,7 +1,6 @@
 import { CONFIG } from '../config/constants';
 import { findFirstVisible } from '../utils/domHelpers';
 import { Logger } from '../utils/Logger';
-import { VideoManager } from '../utils/VideoManager';
 
 /**
  * Ad Skipping Feature
@@ -14,8 +13,6 @@ import { VideoManager } from '../utils/VideoManager';
 export function trySkipAd(): void {
   const player = document.getElementById('movie_player');
   if (!player?.classList.contains('ad-showing')) return;
-
-  const videoManager = VideoManager.getInstance();
   const adVideo = player.querySelector('video') as HTMLVideoElement;
 
   // Fast-forward unskippable ads
@@ -32,7 +29,7 @@ export function trySkipAd(): void {
  * Finds and clicks the skip ad button
  */
 function clickSkipAdButton(): void {
-  const skipButton = findFirstVisible<HTMLElement>(CONFIG.SELECTORS.AD_SKIP_BUTTON);
+  const skipButton = findFirstVisible(CONFIG.SELECTORS.AD_SKIP_BUTTON);
 
   if (skipButton) {
     Logger.log('Found skip button, clicking it');

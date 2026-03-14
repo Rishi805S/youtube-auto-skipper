@@ -1,147 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SponsorSkip</title>
-    <link rel="stylesheet" href="popup.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SponsorSkip</title>
+  <link rel="stylesheet" href="popup.css">
 </head>
-<body data-theme="dark">
-    <div class="popup-container">
-        <!-- Header -->
-        <div class="header">
-            <div class="logo">
-                <div class="logo-icon">💰</div>
-                <h1>SponsorSkip</h1>
-            </div>
-            <div class="theme-controls">
-                <button class="theme-toggle" id="themeToggle">
-                    <span class="theme-icon">🌙</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Status Card -->
-        <div class="status-card">
-            <div class="status-indicator" id="statusIndicator">
-                <div class="status-dot active"></div>
-                <span class="status-text" id="statusText">Active</span>
-            </div>
-            <div class="master-toggle">
-                <label class="toggle-switch">
-                    <input type="checkbox" id="masterToggle" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
-        </div>
-
-        <!-- Stats Grid -->
-        <div class="stats-grid">
-            <div class="stat-item">
-                <div class="stat-value" id="totalSkips">0</div>
-                <div class="stat-label">Skipped</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value" id="timeSaved">0m</div>
-                <div class="stat-label">Saved</div>
-            </div>
-        </div>
-
-        <!-- Sponsor Control -->
-        <div class="sponsor-section">
-            <div class="section-title">
-                <span class="sponsor-emoji">💰</span>
-                <span>Sponsor Segments</span>
-            </div>
-            <div class="sponsor-actions">
-                <button class="action-btn skip active" data-action="skip">
-                    <span class="action-icon">⏭️</span>
-                    <span>Skip</span>
-                </button>
-                <button class="action-btn mute" data-action="mute">
-                    <span class="action-icon">🔇</span>
-                    <span>Mute</span>
-                </button>
-                <button class="action-btn ignore" data-action="ignore">
-                    <span class="action-icon">👁️</span>
-                    <span>Watch</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Ad Skipping Setting -->
-        <div class="ad-section">
-            <div class="ad-control">
-                <div class="ad-info">
-                    <span class="ad-icon">📺</span>
-                    <span class="ad-label">Skip YouTube Ads</span>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="adToggle" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
-        </div>
-
-        <!-- Sync Setting -->
-        <div class="sync-section">
-            <div class="sync-control">
-                <div class="sync-info">
-                    <span class="sync-icon">🔄</span>
-                    <span class="sync-label">Sync Across Devices</span>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="syncToggle" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
-        </div>
-
-        <!-- Keyboard Shortcuts Help -->
-        <div class="shortcuts-section">
-            <div class="section-title">
-                <span class="shortcuts-emoji">⌨️</span>
-                <span>Keyboard Shortcuts</span>
-            </div>
-            <div class="shortcuts-grid">
-                <div class="shortcut-item">
-                    <span class="shortcut-key">Alt + S</span>
-                    <span class="shortcut-desc">Toggle Extension</span>
-                </div>
-                <div class="shortcut-item">
-                    <span class="shortcut-key">Alt + 1</span>
-                    <span class="shortcut-desc">Skip Segments</span>
-                </div>
-                <div class="shortcut-item">
-                    <span class="shortcut-key">Alt + 2</span>
-                    <span class="shortcut-desc">Mute Segments</span>
-                </div>
-                <div class="shortcut-item">
-                    <span class="shortcut-key">Alt + 3</span>
-                    <span class="shortcut-desc">Watch Segments</span>
-                </div>
-                <div class="shortcut-item">
-                    <span class="shortcut-key">Alt + A</span>
-                    <span class="shortcut-desc">Toggle Ad Skipping</span>
-                </div>
-                <div class="shortcut-item">
-                    <span class="shortcut-key">Alt + O</span>
-                    <span class="shortcut-desc">Open Popup</span>
-                </div>
-                <div class="shortcut-item">
-                    <span class="shortcut-key">Alt + H</span>
-                    <span class="shortcut-desc">Show Help</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="footer">
-            <button class="footer-btn" id="resetStats">Reset</button>
-            <div class="version">v1.0</div>
-        </div>
+<body>
+  <div class="popup-container">
+    <div class="header">
+      <div class="logo">
+        <div class="logo-icon">SS</div>
+        <h1>SponsorSkip</h1>
+      </div>
     </div>
 
-    <script src="popup.js"></script>
+    <div class="status-card">
+      <div class="status-indicator">
+        <div class="status-dot active"></div>
+        <span class="status-text" id="statusText">Active</span>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="masterToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-value" id="totalSkips">0</div>
+        <div class="stat-label">Skipped</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="timeSaved">0m</div>
+        <div class="stat-label">Saved</div>
+      </div>
+    </div>
+
+    <div class="sponsor-section">
+      <div class="section-title">Sponsor Segments</div>
+      <div class="sponsor-actions">
+        <button class="action-btn skip active" data-action="skip">Skip</button>
+        <button class="action-btn mute" data-action="mute">Mute</button>
+        <button class="action-btn ignore" data-action="ignore">Watch</button>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="version">v1.0</div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
 </body>
 </html>

@@ -2,6 +2,8 @@ export class Logger {
   private static prefix = '[SponsorSkip]';
   private static isDebug = true; // Could be toggled via settings
 
+  // ..args = rest parameter
+  // Means collect all arguements passed into this array
   static log(message: string, ...args: any[]) {
     if (this.isDebug) {
       console.log(`${this.prefix} ${message}`, ...args);
