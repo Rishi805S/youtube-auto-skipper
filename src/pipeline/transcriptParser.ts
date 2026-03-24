@@ -3,6 +3,9 @@ import { clickWithRetry, waitForElement } from '../utils/domHelpers';
 import { CONFIG } from '../config/constants';
 import { fetchTranscript } from 'youtube-transcript';
 
+const TRANSCRIPT_API_TIMEOUT_MS = 3000;
+const transcriptApiDisabledVideos = new Set<string>();
+
 /**
  * TIER 3: Parse transcript and detect sponsor segments using heuristics
  */
@@ -66,7 +69,12 @@ async function getCaptions(trackUrl: string): Promise<Cue[]> {
 }
 
 async function getCaptionsFromTranscriptApi(videoId: string): Promise<Cue[]> {
-  const transcript = await fetchTranscript(videoId);
+  const transcript = await Promise.race([
+    fetchTranscript(videoId),
+    new Promise<never>((_, reject) => {
+      window.setTimeout(() => reject(new Error('youtube-transcript timed out')), TRANSCRIPT_API_TIMEOUT_MS);
+    }),
+  ]);
 
   return transcript
     .map((entry) => ({
@@ -76,17 +84,32 @@ async function getCaptionsFromTranscriptApi(videoId: string): Promise<Cue[]> {
     .filter((cue) => cue.text.length > 0);
 }
 
+function normalizeTranscriptText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[’']/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function findMatchingPhrase(text: string, phrases: string[]): string | null {
+  return phrases.find((phrase) => text.includes(phrase)) ?? null;
+}
+
 /**
  * Detect sponsor segments using keyword heuristics
  */
 function detectSponsorSegments(cues: Cue[]): Segment[] {
   const segments: Segment[] = [];
-  const { SEGMENT_DURATION, GAP_THRESHOLD, MIN_CONFIDENCE, MAX_CONFIDENCE, CONFIDENCE_INCREMENT } =
+  const { SEGMENT_DURATION, GAP_THRESHOLD } =
     CONFIG.TRANSCRIPT_HEURISTICS;
 
-  // Sponsor detection keywords
-  const sponsorKeywords = [
+  const sponsorStartKeywords = [
     'sponsor',
+    'todays sponsor',
+    'thank todays sponsor',
+    'thanks to todays sponsor',
     'sponsored',
     'advertisement',
     'promotion',
@@ -99,57 +122,90 @@ function detectSponsorSegments(cues: Cue[]): Segment[] {
     'commercial break',
     'sponsored content',
     'paid promotion',
+    'our sponsor',
+    'this sponsor',
   ];
 
-  // Compile regexes for whole word/phrase matching
-  const sponsorRegexes = sponsorKeywords.map(
-    (keyword) => new RegExp(`\\\\b${keyword.replace(/[-/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&')}\\\\b`, 'i')
-  );
+  const sponsorEndKeywords = [
+    'link in description',
+    'link in the description',
+    'link below',
+    'links below',
+    'description below',
+    'description box',
+    'in the description',
+    'check them out',
+    'check it out',
+    'use promo code',
+    'use code',
+    'use my code',
+    'promo code',
+    'discount code',
+    'coupon code',
+    'go to',
+    'sign up at',
+    'sign up and get',
+    'back to the video',
+    'back to our video',
+    'lets get back to the video',
+    "let's get back to the video",
+  ];
 
-  let currentSegment: { start: number; end: number; confidence: number } | null = null;
+  const normalizedStartKeywords = sponsorStartKeywords.map(normalizeTranscriptText);
+  const normalizedEndKeywords = sponsorEndKeywords.map(normalizeTranscriptText);
+
+  let currentSegment: { start: number; fallbackEnd: number } | null = null;
 
   for (let i = 0; i < cues.length; i++) {
     const cue = cues[i];
-    const hasSponsorKeywords = sponsorRegexes.some((regex) => regex.test(cue.text));
+    const normalizedText = normalizeTranscriptText(cue.text);
 
-    if (hasSponsorKeywords) {
-      // Start or extend current segment
+    if (currentSegment && cue.start - currentSegment.start > GAP_THRESHOLD) {
+      segments.push({
+        start: currentSegment.start,
+        end: currentSegment.fallbackEnd,
+        category: 'sponsor',
+      });
+      currentSegment = null;
+    }
+
+    const startMatch = findMatchingPhrase(normalizedText, normalizedStartKeywords);
+    const endMatch = findMatchingPhrase(normalizedText, normalizedEndKeywords);
+
+    if (currentSegment && endMatch && cue.start >= currentSegment.start) {
+      const nextCueStart = cues[i + 1]?.start;
+      segments.push({
+        start: currentSegment.start,
+        end: Math.max(nextCueStart ?? cue.start + 2, currentSegment.start + 1),
+        category: 'sponsor',
+      });
+      console.log(`[Tier 3] Sponsor end match "${endMatch}" at ${cue.start}s`);
+      currentSegment = null;
+      continue;
+    }
+
+    if (startMatch) {
       if (!currentSegment) {
         currentSegment = {
           start: cue.start,
-          end: cue.start + SEGMENT_DURATION,
-          confidence: MIN_CONFIDENCE,
+          fallbackEnd: cue.start + SEGMENT_DURATION,
         };
+        console.log(`[Tier 3] Sponsor start match "${startMatch}" at ${cue.start}s`);
       } else {
-        currentSegment.end = cue.start + SEGMENT_DURATION;
-        currentSegment.confidence = Math.min(
-          currentSegment.confidence + CONFIDENCE_INCREMENT,
-          MAX_CONFIDENCE
-        );
-      }
-    } else if (currentSegment) {
-      // End segment if gap is too large
-      if (cue.start - currentSegment.end > GAP_THRESHOLD) {
-        segments.push({
-          start: currentSegment.start,
-          end: currentSegment.end,
-          category: 'sponsor',
-        });
-        currentSegment = null;
+        currentSegment.fallbackEnd = Math.max(currentSegment.fallbackEnd, cue.start + SEGMENT_DURATION);
       }
     }
   }
 
-  // Add final segment if exists
   if (currentSegment) {
     segments.push({
       start: currentSegment.start,
-      end: currentSegment.end,
+      end: currentSegment.fallbackEnd,
       category: 'sponsor',
     });
   }
 
-  return segments;
+  return segments.filter((segment) => segment.end > segment.start);
 }
 
 /**
@@ -163,11 +219,21 @@ export async function parseTranscriptSegments(
   try {
     let cues: Cue[] = [];
 
-    try {
-      cues = await getCaptionsFromTranscriptApi(videoId);
-      console.log(`[Tier 3] Loaded ${cues.length} transcript cues from youtube-transcript`);
-    } catch (error) {
-      console.warn('[Tier 3] youtube-transcript fetch failed, falling back:', error);
+    if (!transcriptApiDisabledVideos.has(videoId)) {
+      try {
+        cues = await getCaptionsFromTranscriptApi(videoId);
+        console.log(`[Tier 3] Loaded ${cues.length} transcript cues from youtube-transcript`);
+
+        if (!cues.length) {
+          transcriptApiDisabledVideos.add(videoId);
+          console.log('[Tier 3] youtube-transcript returned no cues, switching to fallback');
+        }
+      } catch (error) {
+        transcriptApiDisabledVideos.add(videoId);
+        console.warn('[Tier 3] youtube-transcript fetch failed, switching to fallback:', error);
+      }
+    } else {
+      console.log('[Tier 3] youtube-transcript already disabled for this video, using fallback');
     }
 
     if (!cues.length && trackUrl) {
