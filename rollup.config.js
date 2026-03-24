@@ -1,5 +1,13 @@
 import typescript from '@rollup/plugin-typescript';
+import commonjs from '@rollup/plugin-commonjs';
+import { nodeResolve } from '@rollup/plugin-node-resolve';
 import copy from 'rollup-plugin-copy';
+
+const sharedPlugins = [
+  typescript({ tsconfig: './tsconfig.json' }),
+  nodeResolve({ browser: true }),
+  commonjs(),
+];
 
 export default [
   // Build the background script
@@ -11,7 +19,7 @@ export default [
       sourcemap: process.env.NODE_ENV !== 'production',
     },
     plugins: [
-      typescript({ tsconfig: './tsconfig.json' }),
+      ...sharedPlugins,
       copy({
         targets: [
           { src: 'manifest.json', dest: 'dist/' },
@@ -33,7 +41,7 @@ export default [
       format: 'iife',
       sourcemap: process.env.NODE_ENV !== 'production',
     },
-    plugins: [typescript({ tsconfig: './tsconfig.json' })],
+    plugins: sharedPlugins,
   },
   // Build the popup script
   {
@@ -43,6 +51,6 @@ export default [
       format: 'iife',
       sourcemap: process.env.NODE_ENV !== 'production',
     },
-    plugins: [typescript({ tsconfig: './tsconfig.json' })],
+    plugins: sharedPlugins,
   },
 ];

@@ -1,6 +1,7 @@
 import { Cue, Segment } from '../types/types';
 import { clickWithRetry, waitForElement } from '../utils/domHelpers';
 import { CONFIG } from '../config/constants';
+import { fetchTranscript } from 'youtube-transcript';
 
 /**
  * TIER 3: Parse transcript and detect sponsor segments using heuristics
@@ -60,6 +61,17 @@ async function getCaptions(trackUrl: string): Promise<Cue[]> {
     .map((node) => ({
       start: parseFloat(node.getAttribute('start') || '0'),
       text: (node.textContent || '').replace(/\s+/g, ' ').trim(),
+    }))
+    .filter((cue) => cue.text.length > 0);
+}
+
+async function getCaptionsFromTranscriptApi(videoId: string): Promise<Cue[]> {
+  const transcript = await fetchTranscript(videoId);
+
+  return transcript
+    .map((entry) => ({
+      start: entry.offset,
+      text: entry.text.trim(),
     }))
     .filter((cue) => cue.text.length > 0);
 }
@@ -143,14 +155,27 @@ function detectSponsorSegments(cues: Cue[]): Segment[] {
 /**
  * Main Tier 3 entry point
  */
-export async function parseTranscriptSegments(trackUrl?: string | null): Promise<Segment[]> {
+
+export async function parseTranscriptSegments(
+  videoId: string,
+  trackUrl?: string | null
+): Promise<Segment[]> {
   try {
     let cues: Cue[] = [];
 
-    if (trackUrl) {
+    try {
+      cues = await getCaptionsFromTranscriptApi(videoId);
+      console.log(`[Tier 3] Loaded ${cues.length} transcript cues from youtube-transcript`);
+    } catch (error) {
+      console.warn('[Tier 3] youtube-transcript fetch failed, falling back:', error);
+    }
+
+    if (!cues.length && trackUrl) {
       cues = await getCaptions(trackUrl);
       console.log(`[Tier 3] Loaded ${cues.length} transcript cues from caption track`);
-    } else {
+    }
+
+    if (!cues.length) {
       await openTranscriptPanel();
       await waitForElement('ytd-transcript-renderer', 3000);
       cues = parseTranscriptPanel();

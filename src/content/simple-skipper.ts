@@ -28,12 +28,15 @@ const initializedVideos = new WeakSet<HTMLVideoElement>();
 let currentSegments: Segment[] = [];
 let currentVideoId: string | null = null;
 let currentTrackUrl: string | null = null;
+let isLoadingSegments = false;
+let pendingSegmentsReload = false;
 let originalVolume = 1;
 let isMuted = false;
 let totalSkips = 0;
 let totalTimeSaved = 0;
 let progressVisualizer: ProgressBarVisualizer | null = null;
 let adDetectionInterval: NodeJS.Timeout | null = null;
+const attemptedSegmentLoadKeys = new Set<string>();
 
 function getVideoId(): string | null {
   const match = window.location.href.match(/[?&]v=([^&]+)/);
@@ -82,22 +85,43 @@ async function loadSegments() {
   const videoId = getVideoId();
   Logger.log('Current video ID:', videoId);
 
-  if (videoId && (videoId !== currentVideoId || (!currentSegments.length && currentTrackUrl))) {
+  if (!videoId) {
+    return;
+  }
+
+  if (videoId !== currentVideoId) {
     Logger.log('New video detected, loading segments...');
-    if (videoId !== currentVideoId) {
-      currentVideoId = videoId;
-      currentTrackUrl = null;
-      skippedSegments.clear();
-      lastSkipTimes.clear();
-      totalSkips = 0;
-      totalTimeSaved = 0;
+    currentVideoId = videoId;
+    currentTrackUrl = null;
+    currentSegments = [];
+    skippedSegments.clear();
+    lastSkipTimes.clear();
+    totalSkips = 0;
+    totalTimeSaved = 0;
+    attemptedSegmentLoadKeys.clear();
 
-      if (progressVisualizer) {
-        progressVisualizer.destroy();
-        progressVisualizer = null;
-      }
+    if (progressVisualizer) {
+      progressVisualizer.destroy();
+      progressVisualizer = null;
     }
+  }
 
+  if (isLoadingSegments) {
+    pendingSegmentsReload = true;
+    Logger.log('Segment load already in progress, queueing one retry');
+    return;
+  }
+
+  const loadKey = `${videoId}::${currentTrackUrl ?? 'no-track-url'}`;
+  if (attemptedSegmentLoadKeys.has(loadKey)) {
+    Logger.log('Skipping duplicate segment load attempt for key:', loadKey);
+    return;
+  }
+
+  attemptedSegmentLoadKeys.add(loadKey);
+  isLoadingSegments = true;
+
+  try {
     currentSegments = await getSegmentsByPriority(videoId, currentTrackUrl);
     Logger.log('Segments loaded:', currentSegments);
 
@@ -115,6 +139,13 @@ async function loadSegments() {
           checkForSkip(video);
         }
       }, 100);
+    }
+  } finally {
+    isLoadingSegments = false;
+
+    if (pendingSegmentsReload) {
+      pendingSegmentsReload = false;
+      void loadSegments();
     }
   }
 }
@@ -219,7 +250,7 @@ function initialize() {
 
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
+      for (const node of Array.from(mutation.addedNodes)) {
         const video = findVideoNode(node);
         if (video) {
           Logger.log('Video element added');
