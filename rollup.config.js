@@ -1,13 +1,5 @@
 import typescript from '@rollup/plugin-typescript';
-import commonjs from '@rollup/plugin-commonjs';
-import { nodeResolve } from '@rollup/plugin-node-resolve';
 import copy from 'rollup-plugin-copy';
-
-const sharedPlugins = [
-  typescript({ tsconfig: './tsconfig.json' }),
-  nodeResolve({ browser: true }),
-  commonjs(),
-];
 
 export default [
   // Build the background script
@@ -18,8 +10,18 @@ export default [
       format: 'iife',
       sourcemap: process.env.NODE_ENV !== 'production',
     },
+    plugins: [typescript({ tsconfig: './tsconfig.json' })],
+  },
+  // Build the content script
+  {
+    input: 'src/content/simple-skipper.ts',
+    output: {
+      file: 'dist/content.js',
+      format: 'iife',
+      sourcemap: process.env.NODE_ENV !== 'production',
+    },
     plugins: [
-      ...sharedPlugins,
+      typescript({ tsconfig: './tsconfig.json' }),
       copy({
         targets: [
           { src: 'manifest.json', dest: 'dist/' },
@@ -33,16 +35,6 @@ export default [
       }),
     ],
   },
-  // Build the content script
-  {
-    input: 'src/content/simple-skipper.ts',
-    output: {
-      file: 'dist/content.js',
-      format: 'iife',
-      sourcemap: process.env.NODE_ENV !== 'production',
-    },
-    plugins: sharedPlugins,
-  },
   // Build the popup script
   {
     input: 'src/popup/popup.ts',
@@ -51,6 +43,6 @@ export default [
       format: 'iife',
       sourcemap: process.env.NODE_ENV !== 'production',
     },
-    plugins: sharedPlugins,
+    plugins: [typescript({ tsconfig: './tsconfig.json' })],
   },
 ];

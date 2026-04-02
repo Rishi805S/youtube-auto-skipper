@@ -16,6 +16,7 @@ yarn-error.log*
 # Production
 /dist
 /build
+/.worktrees
 
 # Misc
 .DS_Store

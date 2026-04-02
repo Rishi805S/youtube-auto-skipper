@@ -1,24 +1,12 @@
 interface PopupState {
   enabled: boolean;
   sponsorAction: 'skip' | 'mute' | 'ignore';
-  skipAds: boolean;
-}
-
-interface PopupStats {
-  totalSkips: number;
-  timeSaved: number;
 }
 
 class PopupController {
   private state: PopupState = {
     enabled: true,
     sponsorAction: 'skip',
-    skipAds: true,
-  };
-
-  private stats: PopupStats = {
-    totalSkips: 0,
-    timeSaved: 0,
   };
 
   constructor() {
@@ -29,7 +17,6 @@ class PopupController {
     await this.loadState();
     this.setupEventListeners();
     this.updateUI();
-    this.startStatsUpdater();
   }
 
   private async saveAndNotifyState(): Promise<void> {
@@ -37,7 +24,6 @@ class PopupController {
       await chrome.storage.sync.set({
         enabled: this.state.enabled,
         sponsorAction: this.state.sponsorAction,
-        skipAds: this.state.skipAds,
       });
       await this.notifyContentScript();
     } catch (error) {
@@ -47,25 +33,15 @@ class PopupController {
 
   private async loadState(): Promise<void> {
     try {
-      const result = await chrome.storage.sync.get(['enabled', 'sponsorAction', 'skipAds']);
-      if (
-        result.enabled !== undefined ||
-        result.sponsorAction !== undefined ||
-        result.skipAds !== undefined
-      ) {
+      const result = await chrome.storage.sync.get(['enabled', 'sponsorAction']);
+      if (result.enabled !== undefined || result.sponsorAction !== undefined) {
         this.state = {
           ...this.state,
           enabled: result.enabled ?? this.state.enabled,
           sponsorAction: result.sponsorAction ?? this.state.sponsorAction,
-          skipAds: result.skipAds ?? this.state.skipAds,
         };
       } else {
         await this.saveAndNotifyState();
-      }
-
-      const statsResult = await chrome.storage.local.get(['sponsorSkipStats']);
-      if (statsResult.sponsorSkipStats) {
-        this.stats = { ...this.stats, ...statsResult.sponsorSkipStats };
       }
 
       await this.notifyContentScript();
@@ -115,7 +91,6 @@ class PopupController {
     if (masterToggle) masterToggle.checked = this.state.enabled;
 
     this.updateSponsorButtons();
-    this.updateStats();
     this.updateStatusIndicator();
   }
 
@@ -139,42 +114,6 @@ class PopupController {
     } else {
       statusText.textContent = 'Disabled';
       statusDot.classList.remove('active');
-    }
-  }
-
-  private updateStats(): void {
-    const totalSkipsEl = document.getElementById('totalSkips');
-    const timeSavedEl = document.getElementById('timeSaved');
-
-    if (totalSkipsEl) totalSkipsEl.textContent = this.stats.totalSkips.toString();
-
-    if (timeSavedEl) {
-      const minutes = Math.floor(this.stats.timeSaved / 60);
-      timeSavedEl.textContent = minutes > 0 ? `${minutes}m` : '0m';
-    }
-  }
-
-  private startStatsUpdater(): void {
-    setInterval(async () => {
-      await this.fetchLatestStats();
-      this.updateStats();
-    }, 2000);
-  }
-
-  private async fetchLatestStats(): Promise<void> {
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab.id && tab.url?.includes('youtube.com/watch')) {
-        const response = await chrome.tabs.sendMessage(tab.id, {
-          type: 'GET_STATS',
-        });
-
-        if (response) {
-          this.stats = { ...this.stats, ...response };
-        }
-      }
-    } catch {
-      // Ignore tabs without a content script.
     }
   }
 }

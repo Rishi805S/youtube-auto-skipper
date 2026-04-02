@@ -1,24 +1,17 @@
-import { Segment } from '../types/types';
-import { ProgressBarVisualizer } from '../ui/ProgressBarVisualizer';
-import { getSegmentsByPriority } from '../engine/tieredFetcher';
-import { startAdDetection, stopAdDetection } from '../features/adSkipper';
 import { CONFIG } from '../config/constants';
-import { Logger } from '../utils/Logger';
-import { getVideo } from '../utils/VideoManager';
+import { getSegmentsByPriority } from '../engine/tieredFetcher';
 import { debounce } from '../utils/domHelpers';
+import { getVideo } from '../utils/VideoManager';
+import { Segment } from '../types/types';
 
 interface SkipperState {
   isEnabled: boolean;
   sponsorAction: 'skip' | 'mute' | 'ignore';
-  skipAds: boolean;
 }
-
-Logger.log('Simple content script loaded');
 
 const state: SkipperState = {
   isEnabled: CONFIG.DEFAULTS.ENABLED,
   sponsorAction: CONFIG.DEFAULTS.ACTION,
-  skipAds: CONFIG.DEFAULTS.SKIP_ADS,
 };
 
 const skippedSegments = new Set<number>();
@@ -28,32 +21,16 @@ const initializedVideos = new WeakSet<HTMLVideoElement>();
 let currentSegments: Segment[] = [];
 let currentVideoId: string | null = null;
 let currentTrackUrl: string | null = null;
-let isLoadingSegments = false;
-let pendingSegmentsReload = false;
 let originalVolume = 1;
 let isMuted = false;
-let totalSkips = 0;
-let totalTimeSaved = 0;
-let progressVisualizer: ProgressBarVisualizer | null = null;
-let adDetectionInterval: NodeJS.Timeout | null = null;
-const attemptedSegmentLoadKeys = new Set<string>();
 
 function getVideoId(): string | null {
   const match = window.location.href.match(/[?&]v=([^&]+)/);
   return match ? match[1] : null;
 }
 
-function updateState(newState: Partial<SkipperState>) {
+function updateState(newState: Partial<SkipperState>): void {
   Object.assign(state, newState);
-  Logger.log('State updated:', state);
-
-  if (newState.skipAds !== undefined) {
-    if (state.skipAds) {
-      startAdDetectionLoop();
-    } else {
-      stopAdDetectionLoop();
-    }
-  }
 
   if (newState.sponsorAction && newState.sponsorAction !== 'mute' && isMuted) {
     const video = getVideo();
@@ -61,141 +38,79 @@ function updateState(newState: Partial<SkipperState>) {
       video.volume = originalVolume;
     }
     isMuted = false;
-    Logger.log('Volume restored (action changed)');
   }
 }
 
-function startAdDetectionLoop() {
-  if (adDetectionInterval) {
-    stopAdDetection(adDetectionInterval);
-  }
-  adDetectionInterval = startAdDetection();
-  Logger.log('Ad detection started');
+// Clears sponsor-related state whenever we move to a different video.
+function resetVideoState(videoId: string): void {
+  currentVideoId = videoId;
+  currentSegments = [];
+  currentTrackUrl = null;
+  skippedSegments.clear();
+  lastSkipTimes.clear();
+  isMuted = false;
 }
 
-function stopAdDetectionLoop() {
-  if (adDetectionInterval) {
-    stopAdDetection(adDetectionInterval);
-    adDetectionInterval = null;
-    Logger.log('Ad detection stopped');
-  }
-}
-
-async function loadSegments() {
+// Runs the 3-tier segment detection pipeline for the current video.
+// forceReload is used when the background script later sends us a caption track URL.
+async function loadSegments(forceReload = false): Promise<void> {
   const videoId = getVideoId();
-  Logger.log('Current video ID:', videoId);
-
   if (!videoId) {
     return;
   }
 
-  if (videoId !== currentVideoId) {
-    Logger.log('New video detected, loading segments...');
-    currentVideoId = videoId;
-    currentTrackUrl = null;
-    currentSegments = [];
-    skippedSegments.clear();
-    lastSkipTimes.clear();
-    totalSkips = 0;
-    totalTimeSaved = 0;
-    attemptedSegmentLoadKeys.clear();
-
-    if (progressVisualizer) {
-      progressVisualizer.destroy();
-      progressVisualizer = null;
-    }
+  const isNewVideo = videoId !== currentVideoId;
+  if (isNewVideo) {
+    resetVideoState(videoId);
   }
 
-  if (isLoadingSegments) {
-    pendingSegmentsReload = true;
-    Logger.log('Segment load already in progress, queueing one retry');
+  if (!isNewVideo && !forceReload) {
     return;
   }
 
-  const loadKey = `${videoId}::${currentTrackUrl ?? 'no-track-url'}`;
-  if (attemptedSegmentLoadKeys.has(loadKey)) {
-    Logger.log('Skipping duplicate segment load attempt for key:', loadKey);
-    return;
-  }
+  currentSegments = await getSegmentsByPriority(videoId, currentTrackUrl);
 
-  attemptedSegmentLoadKeys.add(loadKey);
-  isLoadingSegments = true;
-
-  try {
-    currentSegments = await getSegmentsByPriority(videoId, currentTrackUrl);
-    Logger.log('Segments loaded:', currentSegments);
-
-    if (currentSegments.length > 0) {
-      try {
-        progressVisualizer = new ProgressBarVisualizer(currentSegments);
-        await progressVisualizer.init();
-      } catch (error) {
-        Logger.warn('Visualizer init failed:', error);
-      }
-
-      setTimeout(() => {
-        const video = getVideo();
-        if (video) {
-          checkForSkip(video);
-        }
-      }, 100);
-    }
-  } finally {
-    isLoadingSegments = false;
-
-    if (pendingSegmentsReload) {
-      pendingSegmentsReload = false;
-      void loadSegments();
-    }
+  const video = getVideo();
+  if (video) {
+    checkForSkip(video);
   }
 }
 
-/**
- * Periodically checks if the user is currently inside a sponsor segment.
- * If so, performs the configured skip action (skip, mute, or ignore).
- * @param {HTMLVideoElement} video The video element to analyze
- */
-function checkForSkip(video: HTMLVideoElement) {
+// Checks whether the current playback time is inside any detected sponsor segment.
+function checkForSkip(video: HTMLVideoElement): void {
   if (!state.isEnabled || !currentSegments.length || state.sponsorAction === 'ignore') {
-    // If the extension is disabled, or no segments are found, or the sponsor action is set to ignore, exit immediately
+    return;
+  }
+
+  const player = document.querySelector(CONFIG.SELECTORS.PLAYER);
+  if (player?.classList.contains('ad-showing')) {
     return;
   }
 
   const currentTime = video.currentTime;
 
-  const player = document.querySelector(CONFIG.SELECTORS.PLAYER);
-  if (player && player.classList.contains('ad-showing')) {
-    // If the video is currently showing an ad, exit immediately
-    return;
-  }
-
-  // Iterate through all known segments
-  for (let i = 0; i < currentSegments.length; i++) {
-    const segment = currentSegments[i];
+  for (let index = 0; index < currentSegments.length; index++) {
+    const segment = currentSegments[index];
 
     if (currentTime >= segment.start && currentTime < segment.end) {
-      // If the user is currently inside a segment
-      const lastSkipTime = lastSkipTimes.get(i) || 0;
+      const lastSkipTime = lastSkipTimes.get(index) || 0;
       const now = Date.now();
-      const canSkip = !skippedSegments.has(i) || now - lastSkipTime > CONFIG.TIMEOUTS.SKIP_COOLDOWN;
 
-      if (canSkip) {
-        // If the user has not skipped this segment before, or the cooldown has expired, execute the skip action
-        executeSkipAction(video, segment, i);
+      if (!skippedSegments.has(index) || now - lastSkipTime > CONFIG.TIMEOUTS.SKIP_COOLDOWN) {
+        executeSkipAction(video, segment, index);
         break;
       }
     } else if (
-      skippedSegments.has(i) &&
+      skippedSegments.has(index) &&
       (currentTime < segment.start || currentTime >= segment.end)
     ) {
-      // If the user has skipped this segment before and is no longer inside it, remove it from the skipped segments set
-      skippedSegments.delete(i);
+      skippedSegments.delete(index);
     }
   }
 }
 
-function executeSkipAction(video: HTMLVideoElement, segment: Segment, index: number) {
-  const duration = segment.end - segment.start;
+// Executes the user-selected action once the video enters a sponsor segment.
+function executeSkipAction(video: HTMLVideoElement, segment: Segment, index: number): void {
   const now = Date.now();
 
   try {
@@ -206,7 +121,6 @@ function executeSkipAction(video: HTMLVideoElement, segment: Segment, index: num
       }
 
       video.currentTime = segment.end;
-      Logger.log(`Skipped ${segment.start} -> ${segment.end}`);
     } else if (state.sponsorAction === 'mute') {
       if (!isMuted) {
         originalVolume = video.volume;
@@ -214,101 +128,27 @@ function executeSkipAction(video: HTMLVideoElement, segment: Segment, index: num
 
       video.volume = 0;
       isMuted = true;
-      Logger.log(`Muted ${segment.start} -> ${segment.end}`);
 
-      const checkUnmute = () => {
+      const restoreVolume = () => {
         if (video.currentTime >= segment.end) {
           video.volume = originalVolume;
           isMuted = false;
-          video.removeEventListener('timeupdate', checkUnmute);
-          Logger.log('Unmuted');
+          video.removeEventListener('timeupdate', restoreVolume);
         }
       };
 
-      video.addEventListener('timeupdate', checkUnmute);
+      video.addEventListener('timeupdate', restoreVolume);
     }
 
     skippedSegments.add(index);
     lastSkipTimes.set(index, now);
-    totalSkips++;
-    totalTimeSaved += duration;
   } catch (error) {
-    Logger.error('Error executing skip action:', error);
+    console.error('[SponsorSkip] Failed to handle segment:', error);
   }
 }
 
-function initialize() {
-  Logger.log('Initializing...');
-
-  chrome.storage.sync.get(['enabled', 'sponsorAction', 'skipAds'], (result) => {
-    updateState({
-      isEnabled: result.enabled ?? CONFIG.DEFAULTS.ENABLED,
-      sponsorAction: result.sponsorAction ?? CONFIG.DEFAULTS.ACTION,
-      skipAds: result.skipAds ?? CONFIG.DEFAULTS.SKIP_ADS,
-    });
-  });
-
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      for (const node of Array.from(mutation.addedNodes)) {
-        const video = findVideoNode(node);
-        if (video) {
-          Logger.log('Video element added');
-          setupVideoListeners(video);
-          loadSegments();
-          return;
-        }
-      }
-    }
-  });
-
-  if (document.body) {
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
-
-  const video = getVideo();
-  if (video) {
-    setupVideoListeners(video);
-    loadSegments();
-  }
-
-  let lastUrl = location.href;
-  const debouncedLoadSegments = debounce(loadSegments, CONFIG.TIMEOUTS.URL_CHANGE_DELAY);
-
-  new MutationObserver(() => {
-    if (location.href !== lastUrl) {
-      lastUrl = location.href;
-      Logger.log('URL changed');
-      debouncedLoadSegments();
-    }
-  }).observe(document, { subtree: true, childList: true });
-}
-
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === 'SETTINGS_UPDATED') {
-    updateState(msg.settings);
-    sendResponse({ success: true, ...state });
-  } else if (msg.type === 'GET_STATS') {
-    sendResponse({ totalSkips, timeSaved: totalTimeSaved });
-  } else if (msg.type === 'TRACK_URL_FOUND') {
-    if (msg.videoId === getVideoId()) {
-      currentTrackUrl = msg.trackUrl;
-      Logger.log('Track URL received:', currentTrackUrl);
-
-      if (!currentSegments.length) {
-        void loadSegments();
-      }
-
-      sendResponse({ success: true });
-    } else {
-      Logger.log('Ignoring stale track URL for previous video');
-      sendResponse({ success: false, reason: 'stale_video' });
-    }
-  }
-  return true;
-});
-
-function setupVideoListeners(video: HTMLVideoElement) {
+// Registers playback listeners once per video element.
+function setupVideoListeners(video: HTMLVideoElement): void {
   if (initializedVideos.has(video)) {
     return;
   }
@@ -327,6 +167,7 @@ function setupVideoListeners(video: HTMLVideoElement) {
   video.addEventListener('seeked', () => checkForSkip(video));
 }
 
+// Helps the DOM observer recognize when a newly added node contains a <video>.
 function findVideoNode(node: Node): HTMLVideoElement | null {
   if (node instanceof HTMLVideoElement) {
     return node;
@@ -339,9 +180,76 @@ function findVideoNode(node: Node): HTMLVideoElement | null {
   return null;
 }
 
-window.addEventListener('beforeunload', () => {
-  progressVisualizer?.destroy();
-  stopAdDetectionLoop();
+// Bootstraps the content script:
+// 1. load popup settings
+// 2. watch for video elements
+// 3. watch for YouTube URL changes
+function initialize(): void {
+  chrome.storage.sync.get(['enabled', 'sponsorAction'], (result) => {
+    updateState({
+      isEnabled: result.enabled ?? CONFIG.DEFAULTS.ENABLED,
+      sponsorAction: result.sponsorAction ?? CONFIG.DEFAULTS.ACTION,
+    });
+  });
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of Array.from(mutation.addedNodes)) {
+        const video = findVideoNode(node);
+        if (video) {
+          setupVideoListeners(video);
+          void loadSegments();
+          return;
+        }
+      }
+    }
+  });
+
+  if (document.body) {
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  const video = getVideo();
+  if (video) {
+    setupVideoListeners(video);
+    void loadSegments();
+  }
+
+  let lastUrl = location.href;
+  const debouncedLoadSegments = debounce(() => {
+    void loadSegments();
+  }, CONFIG.TIMEOUTS.URL_CHANGE_DELAY);
+
+  new MutationObserver(() => {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      currentVideoId = null;
+      currentTrackUrl = null;
+      currentSegments = [];
+      debouncedLoadSegments();
+    }
+  }).observe(document, { subtree: true, childList: true });
+}
+
+// Receives messages from:
+// - the popup when settings change
+// - the background script when a caption track URL is found
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === 'SETTINGS_UPDATED') {
+    updateState(message.settings);
+    sendResponse({ success: true });
+  } else if (message.type === 'TRACK_URL_FOUND') {
+    if (message.videoId === getVideoId()) {
+      currentTrackUrl = message.trackUrl;
+      void loadSegments(true);
+
+      sendResponse({ success: true });
+    } else {
+      sendResponse({ success: false });
+    }
+  }
+
+  return true;
 });
 
 initialize();

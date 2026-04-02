@@ -3,31 +3,29 @@ import { scrapeChapterSegments } from '../pipeline/chapterScraper';
 import { fetchSponsorBlockSegments } from '../api/SponsorBlockClient';
 import { parseTranscriptSegments } from '../pipeline/transcriptParser';
 
-// src/engine/tieredFetcher.ts
-
+// Main 3-tier pipeline:
+// Tier 1 -> description chapters
+// Tier 2 -> SponsorBlock API
+// Tier 3 -> transcript/captions heuristics
 export async function getSegmentsByPriority(
   videoId: string,
   trackUrl?: string | null
 ): Promise<Segment[]> {
   try {
-    // Tier 1: Description Chapters
-    // const chapters = await scrapeChapterSegments();
-    // console.log(`[Fetch][Tier 1] Description chapters: ${chapters.length}`);
-    // if (chapters.length) {
-    //   return chapters;
-    // }
+    // Fastest and simplest: use creator-provided chapters if they contain sponsor labels.
+    const chapters = await scrapeChapterSegments();
+    if (chapters.length) {
+      return chapters;
+    }
 
-    // // Tier 2: SponsorBlock API
-    // const sb = await fetchSponsorBlockSegments(videoId);
-    // console.log(`[Fetch][Tier 2] SponsorBlock API: ${sb.length}`);
-    // if (sb.length) {
-    //   return sb;
-    // }
+    // If chapters are not useful, try crowd-sourced SponsorBlock segments.
+    const sponsorBlockSegments = await fetchSponsorBlockSegments(videoId);
+    if (sponsorBlockSegments.length) {
+      return sponsorBlockSegments;
+    }
 
-    // Tier 3: Transcript Analysis
-    const transcript = await parseTranscriptSegments(videoId, trackUrl);
-    console.log(`[Fetch][Tier 3] Transcript heuristics: ${transcript.length}`);
-    return transcript;
+    // Final fallback: inspect transcript/captions and detect sponsor phrases heuristically.
+    return await parseTranscriptSegments(trackUrl);
   } catch (error) {
     console.error('[Fetch] Error in segment detection:', error);
     return [];

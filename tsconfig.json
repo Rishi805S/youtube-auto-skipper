@@ -1,13 +1,15 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
     "target": "ES2021",
     "module": "ESNext",
     "lib": ["DOM", "ESNext"],
     "strict": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
-    "allowJs": true,
     "resolveJsonModule": true,
+    "types": ["chrome"],
+    "rootDir": "./src",
     "outDir": "dist",
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true

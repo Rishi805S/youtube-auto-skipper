@@ -36,20 +36,6 @@ export async function waitForElement(selector: string, timeout = 3000): Promise<
 }
 
 /**
- * Finds the first visible element from a list of selectors
- * @param selectors Array of CSS selectors to try
- */
-export function findFirstVisible(selectors: string[]): HTMLElement | null {
-  for (const selector of selectors) {
-    const element = document.querySelector<HTMLElement>(selector);
-    if (element && element.offsetParent !== null) {
-      return element;
-    }
-  }
-  return null;
-}
-
-/**
  * Converts timestamp string (MM:SS or HH:MM:SS) to seconds
  * @param timestamp Timestamp string
  */
@@ -72,9 +58,11 @@ export function debounce(
   func: (...args: unknown[]) => void | Promise<void>,
   wait: number
 ): (...args: unknown[]) => void {
-  let timeout: NodeJS.Timeout | null = null;
+  let timeout: ReturnType<typeof window.setTimeout> | null = null;
   return (...args: unknown[]) => {
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
+    if (timeout !== null) {
+      window.clearTimeout(timeout);
+    }
+    timeout = window.setTimeout(() => void func(...args), wait);
   };
 }
