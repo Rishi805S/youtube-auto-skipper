@@ -10,6 +10,16 @@ export default [
       format: 'iife',
       sourcemap: process.env.NODE_ENV !== 'production',
     },
+    plugins: [typescript({ tsconfig: './tsconfig.json' })],
+  },
+  // Build the content script
+  {
+    input: 'src/content/simple-skipper.ts',
+    output: {
+      file: 'dist/content.js',
+      format: 'iife',
+      sourcemap: process.env.NODE_ENV !== 'production',
+    },
     plugins: [
       typescript({ tsconfig: './tsconfig.json' }),
       copy({
@@ -24,16 +34,6 @@ export default [
         verbose: true,
       }),
     ],
-  },
-  // Build the content script
-  {
-    input: 'src/content/simple-skipper.ts',
-    output: {
-      file: 'dist/content.js',
-      format: 'iife',
-      sourcemap: process.env.NODE_ENV !== 'production',
-    },
-    plugins: [typescript({ tsconfig: './tsconfig.json' })],
   },
   // Build the popup script
   {

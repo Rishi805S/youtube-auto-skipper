@@ -7,12 +7,14 @@ import { CONFIG } from '../config/constants';
  */
 
 /**
- * Opens the transcript panel and minimizes description
+ * Opens the YouTube transcript panel.
+ * If the description is expanded, it also tries to minimize it again
+ * so the transcript stays visible and easier to parse.
  */
 async function openTranscriptPanel(): Promise<void> {
   await clickWithRetry('#expand');
   await clickWithRetry('ytd-video-description-transcript-section-renderer button');
-  
+
   // Try to minimize description
   try {
     await clickWithRetry('#description #less', 3, 300);
@@ -23,25 +25,26 @@ async function openTranscriptPanel(): Promise<void> {
 }
 
 /**
- * Parse transcript cues from the panel
+ * Reads transcript rows from the YouTube transcript panel
+ * and converts them into cues of the form { start, text }.
  */
 function parseTranscriptPanel(): Cue[] {
   const panel = document.querySelector<HTMLElement>('ytd-transcript-renderer');
-  if (!panel) return [];
+  if (!panel) {
+    return [];
+  }
 
   const segments = panel.querySelectorAll<HTMLElement>('ytd-transcript-segment-renderer');
 
   return Array.from(segments).map((segment) => {
     const timestampEl = segment.querySelector<HTMLElement>('.segment-timestamp');
     const textEl = segment.querySelector<HTMLElement>('.segment-text');
-    
+
     const timestamp = timestampEl?.innerText.trim() ?? '0:00';
     const parts = timestamp.split(':').map(Number);
-    
+
     const start =
-      parts.length === 2
-        ? parts[0] * 60 + parts[1]
-        : parts[0] * 3600 + parts[1] * 60 + parts[2];
+      parts.length === 2 ? parts[0] * 60 + parts[1] : parts[0] * 3600 + parts[1] * 60 + parts[2];
 
     return {
       start,
@@ -50,6 +53,7 @@ function parseTranscriptPanel(): Cue[] {
   });
 }
 
+// Fetches the caption XML using the caption track URL and converts it into cues.
 async function getCaptions(trackUrl: string): Promise<Cue[]> {
   const xml = await fetch(trackUrl).then((res) => res.text());
 
@@ -65,12 +69,12 @@ async function getCaptions(trackUrl: string): Promise<Cue[]> {
 }
 
 /**
- * Detect sponsor segments using keyword heuristics
+ * Builds sponsor segments by grouping transcript cues that contain
+ * sponsor-related keywords close to each other.
  */
 function detectSponsorSegments(cues: Cue[]): Segment[] {
   const segments: Segment[] = [];
-  const { SEGMENT_DURATION, GAP_THRESHOLD, MIN_CONFIDENCE, MAX_CONFIDENCE, CONFIDENCE_INCREMENT } =
-    CONFIG.TRANSCRIPT_HEURISTICS;
+  const { SEGMENT_DURATION, GAP_THRESHOLD } = CONFIG.TRANSCRIPT_HEURISTICS;
 
   // Sponsor detection keywords
   const sponsorKeywords = [
@@ -91,10 +95,11 @@ function detectSponsorSegments(cues: Cue[]): Segment[] {
 
   // Compile regexes for whole word/phrase matching
   const sponsorRegexes = sponsorKeywords.map(
-    (keyword) => new RegExp(`\\\\b${keyword.replace(/[-/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&')}\\\\b`, 'i')
+    (keyword) =>
+      new RegExp(`\\\\b${keyword.replace(/[-/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&')}\\\\b`, 'i')
   );
 
-  let currentSegment: { start: number; end: number; confidence: number } | null = null;
+  let currentSegment: { start: number; end: number } | null = null;
 
   for (let i = 0; i < cues.length; i++) {
     const cue = cues[i];
@@ -106,14 +111,9 @@ function detectSponsorSegments(cues: Cue[]): Segment[] {
         currentSegment = {
           start: cue.start,
           end: cue.start + SEGMENT_DURATION,
-          confidence: MIN_CONFIDENCE,
         };
       } else {
         currentSegment.end = cue.start + SEGMENT_DURATION;
-        currentSegment.confidence = Math.min(
-          currentSegment.confidence + CONFIDENCE_INCREMENT,
-          MAX_CONFIDENCE
-        );
       }
     } else if (currentSegment) {
       // End segment if gap is too large
@@ -137,11 +137,13 @@ function detectSponsorSegments(cues: Cue[]): Segment[] {
     });
   }
 
-  return segments;
+  return segments.filter((segment) => segment.end > segment.start);
 }
 
 /**
- * Main Tier 3 entry point
+ * Tier 3 entry point.
+ * First try the injected caption track URL because it gives cleaner transcript data.
+ * If that is unavailable or empty, fall back to opening and scraping the transcript panel.
  */
 export async function parseTranscriptSegments(trackUrl?: string | null): Promise<Segment[]> {
   try {
@@ -149,18 +151,15 @@ export async function parseTranscriptSegments(trackUrl?: string | null): Promise
 
     if (trackUrl) {
       cues = await getCaptions(trackUrl);
-      console.log(`[Tier 3] Loaded ${cues.length} transcript cues from caption track`);
-    } else {
+    }
+
+    if (!cues.length) {
       await openTranscriptPanel();
       await waitForElement('ytd-transcript-renderer', 3000);
       cues = parseTranscriptPanel();
-      console.log(`[Tier 3] Loaded ${cues.length} transcript cues from transcript panel`);
     }
 
-    const segments = detectSponsorSegments(cues);
-
-    console.log('[Tier 3] Detected segments from transcript:', segments);
-    return segments;
+    return detectSponsorSegments(cues);
   } catch (error) {
     console.error('[Tier 3] Transcript parsing failed:', error);
     return [];

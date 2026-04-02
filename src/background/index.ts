@@ -1,7 +1,5 @@
 import { InjectorService } from '../services/InjectorService';
 
-console.log('[SponsorSkip] Background script started.');
-
 function getVideoIdFromUrl(url: string): string | null {
   try {
     return new URL(url).searchParams.get('v');
@@ -11,6 +9,7 @@ function getVideoIdFromUrl(url: string): string | null {
 }
 
 async function injectTrackUrlForNavigation(tabId: number, url?: string): Promise<void> {
+  // Only process actual YouTube watch pages.
   if (!url || !url.includes('youtube.com')) {
     return;
   }
@@ -20,19 +19,20 @@ async function injectTrackUrlForNavigation(tabId: number, url?: string): Promise
     return;
   }
 
-  console.log(`[BG] Processing YouTube watch page in tab ${tabId} for video ${videoId}`);
-
   const trackUrl = await InjectorService.injectTrackUrlFetcher(tabId);
-  if (trackUrl) {
-    try {
-      await chrome.tabs.sendMessage(tabId, {
-        type: 'TRACK_URL_FOUND',
-        trackUrl,
-        videoId,
-      });
-    } catch (error) {
-      console.warn('[BG] Could not deliver track URL to content script:', error);
-    }
+  if (!trackUrl) {
+    return;
+  }
+
+  try {
+    // Send the caption track URL to the content script for Tier 3 transcript parsing.
+    await chrome.tabs.sendMessage(tabId, {
+      type: 'TRACK_URL_FOUND',
+      trackUrl,
+      videoId,
+    });
+  } catch {
+    // Ignore tabs where the content script is not ready yet.
   }
 }
 
@@ -40,16 +40,12 @@ const youtubeWatchFilter = {
   url: [{ hostContains: 'youtube.com', pathContains: '/watch' }],
 };
 
-chrome.webNavigation.onCompleted.addListener(
-  async (details) => {
-    await injectTrackUrlForNavigation(details.tabId, details.url);
-  },
-  youtubeWatchFilter
-);
+// Runs on a normal page load.
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+  await injectTrackUrlForNavigation(details.tabId, details.url);
+}, youtubeWatchFilter);
 
-chrome.webNavigation.onHistoryStateUpdated.addListener(
-  async (details) => {
-    await injectTrackUrlForNavigation(details.tabId, details.url);
-  },
-  youtubeWatchFilter
-);
+// Runs on YouTube's in-app route changes without full page reload.
+chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
+  await injectTrackUrlForNavigation(details.tabId, details.url);
+}, youtubeWatchFilter);
